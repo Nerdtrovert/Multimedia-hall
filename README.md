@@ -104,7 +104,7 @@ cp .env.example .env
 
 Edit `backend/.env`:
 ```
-PORT=5000
+
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_mysql_password
@@ -212,6 +212,11 @@ College User                    Backend                      Admin
     |── View Calendar ─────────────>|                           |
     |<── Approved Bookings ─────────|                           |
 ```
+
+### Live page updates
+
+- Admin pages auto-refresh every 10 seconds while the tab is active, so newly submitted booking requests appear without manual reload.
+- User booking pages auto-refresh every 10 seconds while the tab is active, so approval/rejection status changes are shown automatically.
 
 ---
 

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getPendingBookings, updateBookingStatus } from '../../utils/api';
 import { toast } from 'react-toastify';
 import Navbar from '../../components/common/Navbar';
 import PageBackButton from '../../components/common/PageBackButton';
+import useAutoRefresh from '../../hooks/useAutoRefresh';
 import '../Dashboard.css';
 import './AdminRequests.css';
 
@@ -13,14 +14,18 @@ const AdminRequests = () => {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchPending = () => {
-    setLoading(true);
-    getPendingBookings()
-      .then((res) => setRequests(res.data))
-      .finally(() => setLoading(false));
-  };
+  const fetchPending = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    try {
+      const res = await getPendingBookings();
+      setRequests(res.data);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  }, []);
 
-  useEffect(() => { fetchPending(); }, []);
+  useEffect(() => { fetchPending(); }, [fetchPending]);
+  useAutoRefresh(() => fetchPending(false), 10000, !modal && !submitting);
 
   const openModal = (booking, action) => {
     setModal({ booking, action });
@@ -34,7 +39,7 @@ const AdminRequests = () => {
       await updateBookingStatus(modal.booking.id, modal.action, note);
       toast.success(`Booking ${modal.action} successfully. Email sent to college.`);
       setModal(null);
-      fetchPending();
+      fetchPending(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Action failed.');
     } finally {

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPendingBookings, getAnalytics } from '../../utils/api';
 import Navbar from '../../components/common/Navbar';
 import StatusBadge from '../../components/common/StatusBadge';
+import useAutoRefresh from '../../hooks/useAutoRefresh';
 import '../Dashboard.css';
 
 const AdminDashboard = () => {
@@ -10,14 +11,21 @@ const AdminDashboard = () => {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([getPendingBookings(), getAnalytics()])
-      .then(([pendingRes, analyticsRes]) => {
-        setPending(pendingRes.data);
-        setAnalytics(analyticsRes.data);
-      })
-      .finally(() => setLoading(false));
+  const fetchDashboardData = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    try {
+      const [pendingRes, analyticsRes] = await Promise.all([getPendingBookings(), getAnalytics()]);
+      setPending(pendingRes.data);
+      setAnalytics(analyticsRes.data);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+  useAutoRefresh(() => fetchDashboardData(false), 10000);
 
   return (
     <div>

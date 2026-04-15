@@ -1,19 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getMyBookings } from '../../utils/api';
 import Navbar from '../../components/common/Navbar';
 import PageBackButton from '../../components/common/PageBackButton';
 import StatusBadge from '../../components/common/StatusBadge';
+import useAutoRefresh from '../../hooks/useAutoRefresh';
 import '../Dashboard.css';
 
 const MyBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    getMyBookings()
-      .then((res) => setBookings(res.data))
-      .finally(() => setLoading(false));
+  const fetchBookings = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    try {
+      const res = await getMyBookings();
+      setBookings(res.data);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
+
+  useAutoRefresh(() => fetchBookings(false), 10000);
 
   return (
     <div>

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getAllBookings } from '../../utils/api';
 import Navbar from '../../components/common/Navbar';
 import PageBackButton from '../../components/common/PageBackButton';
 import StatusBadge from '../../components/common/StatusBadge';
+import useAutoRefresh from '../../hooks/useAutoRefresh';
 import '../Dashboard.css';
 import './AllBookings.css';
 
@@ -10,22 +11,30 @@ const AllBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({ college: '', status: '', from: '', to: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ college: '', status: '', from: '', to: '' });
 
-  const fetchBookings = (f = filters) => {
-    setLoading(true);
-    getAllBookings(f)
-      .then((res) => setBookings(res.data))
-      .finally(() => setLoading(false));
-  };
+  const fetchBookings = useCallback(async (f, showLoader = true) => {
+    if (showLoader) setLoading(true);
+    try {
+      const res = await getAllBookings(f);
+      setBookings(res.data);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  }, []);
 
-  useEffect(() => { fetchBookings(); }, []);
+  useEffect(() => { fetchBookings(appliedFilters); }, [fetchBookings, appliedFilters]);
+  useAutoRefresh(() => fetchBookings(appliedFilters, false), 10000);
 
   const handleChange = (e) => setFilters({ ...filters, [e.target.name]: e.target.value });
-  const handleSearch = (e) => { e.preventDefault(); fetchBookings(); };
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setAppliedFilters(filters);
+  };
   const handleReset = () => {
     const cleared = { college: '', status: '', from: '', to: '' };
     setFilters(cleared);
-    fetchBookings(cleared);
+    setAppliedFilters(cleared);
   };
 
   return (

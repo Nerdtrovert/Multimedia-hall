@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getMyBookings } from '../../utils/api';
 import Navbar from '../../components/common/Navbar';
 import StatusBadge from '../../components/common/StatusBadge';
+import useAutoRefresh from '../../hooks/useAutoRefresh';
 import '../Dashboard.css';
 
 const UserDashboard = () => {
@@ -11,12 +12,22 @@ const UserDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    getMyBookings()
-      .then((res) => setBookings(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const fetchBookings = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    try {
+      const res = await getMyBookings();
+      setBookings(res.data);
+    } catch {
+      return;
+    } finally {
+      if (showLoader) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
+  useAutoRefresh(() => fetchBookings(false), 10000);
 
   const pending = bookings.filter((b) => b.status === 'pending').length;
   const approved = bookings.filter((b) => b.status === 'approved').length;
