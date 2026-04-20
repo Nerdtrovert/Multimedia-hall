@@ -23,31 +23,35 @@ const Reports = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handlePDF = async () => {
-    setLoading({ ...loading, pdf: true });
-    try {
-      const params = isAdmin ? filters : {};
-      const res = await downloadPDF(params);
-      triggerDownload(res.data, 'bookings_report.pdf');
-      toast.success('PDF downloaded!');
-    } catch {
-      toast.error('Failed to generate PDF.');
-    } finally {
-      setLoading({ ...loading, pdf: false });
-    }
-  };
+  const handleDownload = async (type) => {
+    setLoading((prev) => ({ ...prev, [type]: true }));
 
-  const handleExcel = async () => {
-    setLoading({ ...loading, excel: true });
     try {
       const params = isAdmin ? filters : {};
-      const res = await downloadExcel(params);
-      triggerDownload(res.data, 'bookings_report.xlsx');
-      toast.success('Excel file downloaded!');
+
+      const res =
+        type === 'pdf'
+          ? await downloadPDF(params)
+          : await downloadExcel(params);
+
+      triggerDownload(
+        res.data,
+        type === 'pdf' ? 'bookings_report.pdf' : 'bookings_report.xlsx'
+      );
+
+      toast.success(
+        type === 'pdf'
+          ? 'PDF downloaded!'
+          : 'Excel file downloaded!'
+      );
     } catch {
-      toast.error('Failed to generate Excel file.');
+      toast.error(
+        type === 'pdf'
+          ? 'Failed to generate PDF.'
+          : 'Failed to generate Excel file.'
+      );
     } finally {
-      setLoading({ ...loading, excel: false });
+      setLoading((prev) => ({ ...prev, [type]: false }));
     }
   };
 
@@ -97,10 +101,10 @@ const Reports = () => {
           )}
 
           <div className="export-buttons">
-            <button className="export-btn pdf" onClick={handlePDF} disabled={loading.pdf}>
+            <button className="export-btn pdf" onClick={() => handleDownload('pdf')} disabled={loading.pdf}>
               {loading.pdf ? 'Generating...' : '📄 Download PDF'}
             </button>
-            <button className="export-btn excel" onClick={handleExcel} disabled={loading.excel}>
+            <button className="export-btn excel" onClick={() => handleDownload('excel')} disabled={loading.excel}>
               {loading.excel ? 'Generating...' : '📊 Download Excel'}
             </button>
           </div>

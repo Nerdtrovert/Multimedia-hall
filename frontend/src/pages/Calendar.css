@@ -75,7 +75,7 @@
 }
 
 .fc-dayGridMonth-view .fc-daygrid-day-events {
-  display: none;
+  display: block;
 }
 
 .fc .fc-daygrid-day {

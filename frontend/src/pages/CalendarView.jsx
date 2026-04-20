@@ -36,12 +36,17 @@ const CalendarView = () => {
   const [bookingsByDate, setBookingsByDate] = useState({});
 
   useEffect(() => {
-    fetchBookings();
+    const now = new Date();
+
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    fetchBookings(start.toISOString(), end.toISOString());
   }, []);
 
-  const fetchBookings = async () => {
+  const fetchBookings = async (startDate, endDate) => {
     try {
-      const res = await getCalendarBookings();
+      const res = await getCalendarBookings(startDate, endDate);
       const grouped = res.data.reduce((acc, booking) => {
         const dateKey = booking.event_date.split('T')[0];
         const startMinutes = toMinutes(booking.start_time);
@@ -67,7 +72,7 @@ const CalendarView = () => {
 
       const mapped = res.data.map((booking) => ({
         id: booking.id,
-        title: `${booking.college_name}: ${booking.title}`,
+        title: booking.title,
         start: `${booking.event_date.split('T')[0]}T${booking.start_time}`,
         end: `${booking.event_date.split('T')[0]}T${booking.end_time}`,
         backgroundColor: COLLEGE_COLORS[booking.college_name] || '#6366f1',
@@ -144,6 +149,9 @@ const CalendarView = () => {
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
+            datesSet={(arg) => {
+              fetchBookings(arg.startStr, arg.endStr);
+            }}
             headerToolbar={{
               left: 'prev,next today',
               center: 'title',
@@ -152,10 +160,48 @@ const CalendarView = () => {
             events={events}
             eventClick={handleEventClick}
             dateClick={handleDateClick}
-            dayCellContent={renderDayCell}
             fixedWeekCount={false}
             contentHeight={780}
             aspectRatio={1.65}
+            height="auto"
+            dayMaxEventRows={3}
+            eventDisplay="block"
+            displayEventTime={true}
+            eventTimeFormat={{
+              hour: '2-digit',
+              minute: '2-digit',
+              meridiem: true,
+            }}
+            eventContent={(eventInfo) => {
+              const startTime = eventInfo.event.start?.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+
+              const endTime = eventInfo.event.end?.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+
+              return (
+                <div
+                  style={{
+                    padding: '2px 4px',
+                    fontSize: '11px',
+                    lineHeight: '1.2',
+                    overflow: 'hidden',
+                    whiteSpace: 'normal',
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>
+                    {eventInfo.event.title}
+                  </div>
+                  <div>
+                    {startTime} - {endTime}
+                  </div>
+                </div>
+              );
+            }}
           />
         </div>
 

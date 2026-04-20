@@ -16,8 +16,10 @@ export const submitBooking = (data) => api.post('/bookings', data);
 export const getMyBookings = () => api.get('/bookings/my');
 
 // Bookings - Common
-export const getCalendarBookings = () => api.get('/bookings/calendar');
-
+export const getCalendarBookings = (start, end) =>
+  api.get('/bookings/calendar', {
+    params: { start, end },
+  });
 // Bookings - Admin
 export const getAllBookings = (params) => api.get('/bookings', { params });
 export const getPendingBookings = () => api.get('/bookings/pending');
