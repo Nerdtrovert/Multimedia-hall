@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -34,6 +34,19 @@ const CalendarView = () => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [bookingsByDate, setBookingsByDate] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState('');
+  const [visibleColleges, setVisibleColleges] = useState(() => {
+    const initial = {};
+    Object.keys(COLLEGE_COLORS).forEach((key) => {
+      initial[key] = true;
+    });
+    return initial;
+  });
+  const [initialView, setInitialView] = useState('dayGridMonth');
+
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+  const assetBase = apiBase.replace(/\/api\/?$/, '');
 
   useEffect(() => {
     const now = new Date();
@@ -44,7 +57,25 @@ const CalendarView = () => {
     fetchBookings(start.toISOString(), end.toISOString());
   }, []);
 
+  useEffect(() => {
+    const updateView = () => {
+      if (window.matchMedia('(max-width: 680px)').matches) {
+        setInitialView('timeGridDay');
+      } else if (window.matchMedia('(max-width: 920px)').matches) {
+        setInitialView('timeGridWeek');
+      } else {
+        setInitialView('dayGridMonth');
+      }
+    };
+
+    updateView();
+    window.addEventListener('resize', updateView);
+    return () => window.removeEventListener('resize', updateView);
+  }, []);
+
   const fetchBookings = async (startDate, endDate) => {
+    setLoading(true);
+    setCalendarError('');
     try {
       const res = await getCalendarBookings(startDate, endDate);
       const grouped = res.data.reduce((acc, booking) => {
@@ -84,6 +115,9 @@ const CalendarView = () => {
       setEvents(mapped);
     } catch (err) {
       console.error('Failed to load calendar events');
+      setCalendarError('Failed to load calendar. Please refresh and try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -98,6 +132,19 @@ const CalendarView = () => {
       state: { selectedDate },
     });
   };
+
+  const toggleCollege = (college) => {
+    setVisibleColleges((current) => ({ ...current, [college]: !current[college] }));
+  };
+
+  const filteredEvents = useMemo(() => {
+    return events.filter((event) => {
+      const college = event.extendedProps?.college_name;
+      if (!college) return true;
+      if (visibleColleges[college] === false) return false;
+      return true;
+    });
+  }, [events, visibleColleges]);
 
   const renderDayCell = (arg) => {
     const dateKey = formatDateKey(arg.date);
@@ -131,24 +178,56 @@ const CalendarView = () => {
       <Navbar />
       <div className="calendar-page">
         <PageBackButton fallback={user?.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'} />
-        <div className="page-header">
-          <h2>Auditorium Calendar</h2>
-          <p>All confirmed bookings are shown below. Click a date to start a booking.</p>
+        <div className="calendar-header">
+          <div className="calendar-title">
+            <h2>Auditorium Calendar</h2>
+            <p>
+              {user?.role === 'college'
+                ? 'Click any date to start a booking request. Approved bookings are shown here.'
+                : 'Approved bookings are shown here. Use filters to focus by college.'}
+            </p>
+          </div>
+          {user?.role === 'college' && (
+            <div className="calendar-cta">
+              <button
+                className="btn-primary"
+                type="button"
+                onClick={() => navigate('/user/new-booking')}
+              >
+                New Booking
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="legend">
-          {Object.entries(COLLEGE_COLORS).map(([college, color]) => (
-            <span key={college} className="legend-item">
-              <span className="legend-dot" style={{ background: color }} />
-              {college}
-            </span>
-          ))}
+        <div className="calendar-toolbar">
+          <div className="legend">
+            {Object.entries(COLLEGE_COLORS).map(([college, color]) => {
+              const active = visibleColleges[college] !== false;
+              return (
+                <button
+                  key={college}
+                  type="button"
+                  className={`legend-pill ${active ? 'active' : ''}`}
+                  onClick={() => toggleCollege(college)}
+                  title={active ? `Hide ${college}` : `Show ${college}`}
+                >
+                  <span className="legend-dot" style={{ background: color }} />
+                  {college}
+                </button>
+              );
+            })}
+          </div>
+          <div className="calendar-meta">
+            {loading ? <span className="meta-chip">Loading…</span> : <span className="meta-chip">{filteredEvents.length} booking(s)</span>}
+          </div>
         </div>
 
         <div className="calendar-wrap">
+          {calendarError && <div className="calendar-error">{calendarError}</div>}
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
+            initialView={initialView}
             datesSet={(arg) => {
               fetchBookings(arg.startStr, arg.endStr);
             }}
@@ -157,13 +236,14 @@ const CalendarView = () => {
               center: 'title',
               right: 'dayGridMonth,timeGridWeek,timeGridDay',
             }}
-            events={events}
+            events={filteredEvents}
             eventClick={handleEventClick}
             dateClick={handleDateClick}
             fixedWeekCount={false}
             contentHeight={780}
             aspectRatio={1.65}
             height="auto"
+            dayCellContent={renderDayCell}
             dayMaxEventRows={3}
             eventDisplay="block"
             displayEventTime={true}
@@ -208,13 +288,43 @@ const CalendarView = () => {
         {selectedEvent && (
           <div className="event-modal-overlay" onClick={() => setSelectedEvent(null)}>
             <div className="event-modal" onClick={(e) => e.stopPropagation()}>
-              <button className="modal-close" onClick={() => setSelectedEvent(null)}>Close</button>
-              <h3>{selectedEvent.title}</h3>
+              <button className="modal-close" onClick={() => setSelectedEvent(null)} aria-label="Close">
+                ×
+              </button>
+              <div className="event-modal-header">
+                <h3>{selectedEvent.title}</h3>
+                <span className="event-college-tag">{selectedEvent.college_name}</span>
+              </div>
+              {selectedEvent.poster_url && (
+                <a
+                  href={`${assetBase}${selectedEvent.poster_url}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="event-poster-link"
+                >
+                  <img
+                    src={`${assetBase}${selectedEvent.poster_url}`}
+                    alt="Event poster"
+                    className="event-poster"
+                    loading="lazy"
+                  />
+                </a>
+              )}
               <div className="event-details">
-                <p><strong>College:</strong> {selectedEvent.college_name}</p>
-                <p><strong>Date:</strong> {new Date(selectedEvent.event_date).toDateString()}</p>
-                <p><strong>Time:</strong> {selectedEvent.start_time} - {selectedEvent.end_time}</p>
-                {selectedEvent.purpose && <p><strong>Purpose:</strong> {selectedEvent.purpose}</p>}
+                <div className="event-kv">
+                  <div className="event-k">Date</div>
+                  <div className="event-v">{new Date(selectedEvent.event_date).toDateString()}</div>
+                </div>
+                <div className="event-kv">
+                  <div className="event-k">Time</div>
+                  <div className="event-v">{selectedEvent.start_time} - {selectedEvent.end_time}</div>
+                </div>
+                {selectedEvent.purpose && (
+                  <div className="event-kv">
+                    <div className="event-k">Purpose</div>
+                    <div className="event-v">{selectedEvent.purpose}</div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

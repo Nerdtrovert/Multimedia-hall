@@ -1,6 +1,6 @@
+require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const db = require('./config/db');
-require('dotenv').config();
 
 const seed = async () => {
   const adminPass = await bcrypt.hash('admin123', 10);

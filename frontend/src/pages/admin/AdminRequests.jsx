@@ -13,6 +13,8 @@ const AdminRequests = () => {
   const [modal, setModal] = useState(null); // { booking, action }
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+  const assetBase = apiBase.replace(/\/api\/?$/, '');
 
   const fetchPending = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -76,6 +78,36 @@ const AdminRequests = () => {
                   </span>
                 </div>
                 <h3 className="request-title">{b.title}</h3>
+
+                {(b.poster_url || b.attachment_url) && (
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {b.poster_url && (
+                      <a href={`${assetBase}${b.poster_url}`} target="_blank" rel="noreferrer">
+                        <img
+                          src={`${assetBase}${b.poster_url}`}
+                          alt="Event poster"
+                          style={{
+                            width: 120,
+                            height: 80,
+                            objectFit: 'cover',
+                            borderRadius: 10,
+                            border: '1px solid #e5e7eb',
+                          }}
+                        />
+                      </a>
+                    )}
+                    {b.attachment_url && (
+                      <a
+                        href={`${assetBase}${b.attachment_url}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontSize: 13, fontWeight: 600, color: '#2d6a9f' }}
+                      >
+                        View PDF
+                      </a>
+                    )}
+                  </div>
+                )}
                 {b.purpose && <p className="request-purpose">{b.purpose}</p>}
                 <div className="request-meta">
                   <span>📅 {new Date(b.event_date).toDateString()}</span>

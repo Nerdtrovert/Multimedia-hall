@@ -64,6 +64,11 @@ const generatePDF = async (req, res) => {
       });
     if (!isAdmin)
       doc.text(`College: ${req.user.college_name}`, { align: "center" });
+    doc
+      .fontSize(10)
+      .fillColor("#6b7280")
+      .text(`Records: ${bookings.length}`, { align: "center" });
+    doc.fillColor("black");
     doc.moveDown(2);
 
     // ── Table setup ──────────────────────────────────────────────────────────
@@ -76,7 +81,10 @@ const generatePDF = async (req, res) => {
     // ── Helper: draw one row at a fixed Y ────────────────────────────────────
     const drawRow = (cols, y, bold = false) => {
       let x = TABLE_LEFT;
-      doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(bold ? 10 : 9);
+      doc
+        .fillColor(bold ? "white" : "black")
+        .font(bold ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(bold ? 10 : 9);
       cols.forEach((col, i) => {
         doc.text(
           String(col ?? "—"),
@@ -86,7 +94,7 @@ const generatePDF = async (req, res) => {
             width: colWidths[i] - 8,
             height: ROW_HEIGHT - 4,
             align: "left",
-            lineBreak: false, // ← KEY: prevents cursor from dropping down
+            // With explicit (x,y), PDFKit won't change cursor position anyway.
           },
         );
         x += colWidths[i];
@@ -95,6 +103,9 @@ const generatePDF = async (req, res) => {
 
     // ── Helper: draw row background + bottom border ───────────────────────────
     const drawRowBg = (y, isHeader = false, isEven = false) => {
+      // Use save/restore so fill/stroke colors don't leak into text rendering.
+      doc.save();
+
       if (isHeader) {
         doc
           .rect(TABLE_LEFT, y, TABLE_RIGHT - TABLE_LEFT, ROW_HEIGHT)
@@ -104,6 +115,7 @@ const generatePDF = async (req, res) => {
           .rect(TABLE_LEFT, y, TABLE_RIGHT - TABLE_LEFT, ROW_HEIGHT)
           .fill("#f0f4f8");
       }
+
       // bottom border
       doc
         .moveTo(TABLE_LEFT, y + ROW_HEIGHT)
@@ -111,17 +123,28 @@ const generatePDF = async (req, res) => {
         .strokeColor("#d1d5db")
         .lineWidth(0.5)
         .stroke();
+
+      doc.restore();
     };
 
     // ── Draw header row ───────────────────────────────────────────────────────
     let currentY = doc.y;
     drawRowBg(currentY, true);
-    doc.fillColor("white");
     drawRow(headers, currentY, true);
     doc.fillColor("black"); // reset fill color for data rows
     currentY += ROW_HEIGHT;
 
     // ── Draw data rows ────────────────────────────────────────────────────────
+    if (!bookings || bookings.length === 0) {
+      doc
+        .fillColor("#6b7280")
+        .font("Helvetica")
+        .fontSize(11)
+        .text("No records found for the selected filters.", TABLE_LEFT, currentY + 12);
+      doc.end();
+      return;
+    }
+
     bookings.forEach((b, idx) => {
       // New page if near bottom
       if (currentY + ROW_HEIGHT > 750) {

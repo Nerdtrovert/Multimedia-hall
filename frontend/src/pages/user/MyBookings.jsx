@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getMyBookings } from '../../utils/api';
+import { deleteMyBooking, getMyBookings } from '../../utils/api';
+import { toast } from 'react-toastify';
 import Navbar from '../../components/common/Navbar';
 import PageBackButton from '../../components/common/PageBackButton';
 import StatusBadge from '../../components/common/StatusBadge';
@@ -9,6 +10,7 @@ import '../Dashboard.css';
 const MyBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
 
   const fetchBookings = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -25,6 +27,24 @@ const MyBookings = () => {
   }, [fetchBookings]);
 
   useAutoRefresh(() => fetchBookings(false), 10000);
+
+  const handleDelete = async (booking) => {
+    if (!booking) return;
+
+    const ok = window.confirm(`Delete booking request "${booking.title}"?`);
+    if (!ok) return;
+
+    setDeletingId(booking.id);
+    try {
+      await deleteMyBooking(booking.id);
+      toast.success('Booking deleted.');
+      fetchBookings(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Delete failed.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div>
@@ -52,6 +72,7 @@ const MyBookings = () => {
                   <th>Status</th>
                   <th>Admin Note</th>
                   <th>Submitted</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -64,6 +85,16 @@ const MyBookings = () => {
                     <td><StatusBadge status={b.status} /></td>
                     <td>{b.admin_note || <span style={{ color: '#9ca3af' }}>—</span>}</td>
                     <td>{new Date(b.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <button
+                        className="btn-secondary"
+                        onClick={() => handleDelete(b)}
+                        disabled={deletingId === b.id}
+                        style={{ padding: '6px 10px', fontSize: 12 }}
+                      >
+                        {deletingId === b.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
