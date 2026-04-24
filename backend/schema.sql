@@ -4,8 +4,6 @@
 CREATE DATABASE IF NOT EXISTS auditorium_db;
 USE auditorium_db;
 
-TRUNCATE TABLE audit_logs;
-
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -27,6 +25,10 @@ CREATE TABLE IF NOT EXISTS bookings (
   event_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
+  poster_url VARCHAR(255),
+  poster_name VARCHAR(255),
+  attachment_url VARCHAR(255),
+  attachment_name VARCHAR(255),
   status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
   admin_note TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -244,3 +244,24 @@ College User                    Backend                      Admin
 | Reports | pdfkit (PDF), exceljs (Excel) |
 | State | React Context API |
 | HTTP Client | Axios |
+# Run (Windows)
+
+## One-time setup
+
+From the project root:
+
+```bash
+npm run setup
+```
+
+This installs the root dev dependency `concurrently` plus backend/frontend dependencies.
+
+## Start dev servers
+
+From the project root:
+
+```bash
+npm run dev
+```
+
+If you see `concurrently is not recognized`, it means you skipped the one-time setup above.

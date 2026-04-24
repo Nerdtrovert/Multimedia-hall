@@ -34,6 +34,14 @@ const hasOverlap = (startMinutes, endMinutes, ranges) =>
 
 const normalizeDate = (value) => (value ? value.split('T')[0] : '');
 
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read file.'));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+
 const NewBooking = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -45,6 +53,8 @@ const NewBooking = () => {
     start_time: '',
     end_time: '',
   });
+  const [posterFile, setPosterFile] = useState(null);
+  const [attachmentFile, setAttachmentFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [bookingsByDate, setBookingsByDate] = useState({});
 
@@ -156,7 +166,43 @@ const NewBooking = () => {
 
     setSubmitting(true);
     try {
-      await submitBooking(form);
+      const payload = { ...form };
+
+      if (posterFile) {
+        if (!posterFile.type.startsWith('image/')) {
+          toast.error('Poster must be an image file.');
+          return;
+        }
+        if (posterFile.size > 5 * 1024 * 1024) {
+          toast.error('Poster must be 5 MB or smaller.');
+          return;
+        }
+
+        payload.poster = {
+          name: posterFile.name,
+          type: posterFile.type,
+          dataUrl: await fileToDataUrl(posterFile),
+        };
+      }
+
+      if (attachmentFile) {
+        if (attachmentFile.type !== 'application/pdf') {
+          toast.error('Attachment must be a PDF.');
+          return;
+        }
+        if (attachmentFile.size > 5 * 1024 * 1024) {
+          toast.error('Attachment must be 5 MB or smaller.');
+          return;
+        }
+
+        payload.attachment = {
+          name: attachmentFile.name,
+          type: attachmentFile.type,
+          dataUrl: await fileToDataUrl(attachmentFile),
+        };
+      }
+
+      await submitBooking(payload);
       toast.success('Booking request submitted! You will be notified by email.');
       navigate('/user/my-bookings');
     } catch (err) {
@@ -264,6 +310,28 @@ const NewBooking = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Event Poster (optional)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setPosterFile(e.target.files?.[0] || null)}
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>PDF Attachment (optional)</label>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
+                  disabled={submitting}
+                />
               </div>
             </div>
 

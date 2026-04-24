@@ -12,6 +12,8 @@ const AllBookings = () => {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({ college: '', status: '', from: '', to: '' });
   const [appliedFilters, setAppliedFilters] = useState({ college: '', status: '', from: '', to: '' });
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+  const assetBase = apiBase.replace(/\/api\/?$/, '');
 
   const fetchBookings = useCallback(async (f, showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -80,6 +82,7 @@ const AllBookings = () => {
                   <th>Title</th>
                   <th>Date</th>
                   <th>Time</th>
+                  <th>Assets</th>
                   <th>Status</th>
                   <th>Note</th>
                   <th>Submitted By</th>
@@ -87,13 +90,38 @@ const AllBookings = () => {
               </thead>
               <tbody>
                 {bookings.length === 0 ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', color: '#9ca3af' }}>No records found.</td></tr>
+                  <tr><td colSpan="8" style={{ textAlign: 'center', color: '#9ca3af' }}>No records found.</td></tr>
                 ) : bookings.map((b) => (
                   <tr key={b.id}>
                     <td><strong>{b.college_name}</strong></td>
                     <td>{b.title}</td>
                     <td>{new Date(b.event_date).toLocaleDateString()}</td>
                     <td>{b.start_time} – {b.end_time}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {b.poster_url ? (
+                        <a
+                          href={`${assetBase}${b.poster_url}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="link-btn"
+                        >
+                          Poster
+                        </a>
+                      ) : (
+                        <span style={{ color: '#9ca3af' }}>—</span>
+                      )}
+                      {' '}
+                      {b.attachment_url ? (
+                        <a
+                          href={`${assetBase}${b.attachment_url}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="link-btn"
+                        >
+                          PDF
+                        </a>
+                      ) : null}
+                    </td>
                     <td><StatusBadge status={b.status} /></td>
                     <td>{b.admin_note || <span style={{ color: '#9ca3af' }}>—</span>}</td>
                     <td style={{ fontSize: '12px', color: '#6b7280' }}>{b.user_email}</td>

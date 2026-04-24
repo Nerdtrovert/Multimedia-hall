@@ -1,13 +1,17 @@
 const db = require('../config/db');
 const { sendStatusEmail } = require('../utils/mailer');
 const { logAudit } = require('../utils/audit');
+const { cleanupStoredAssets, saveBase64Upload } = require('../utils/fileStorage');
 
 // ─── College User: Submit a booking request ─────────────────────────────────
 const createBooking = async (req, res) => {
-  const { title, purpose, event_date, start_time, end_time } = req.body;
+  const { title, purpose, event_date, start_time, end_time, poster, attachment } = req.body;
   const { id: user_id, college_name } = req.user;
 
-  if (!title || !event_date || !start_time || !end_time) {
+  const normalizedTitle = title?.trim();
+  const normalizedPurpose = purpose?.trim() || null;
+
+  if (!normalizedTitle || !event_date || !start_time || !end_time) {
     return res.status(400).json({
       message: 'Title, date, start time, and end time are required.',
     });
@@ -41,24 +45,60 @@ const createBooking = async (req, res) => {
       });
     }
 
-    const [result] = await db.query(
-      `INSERT INTO bookings 
-      (user_id, college_name, title, purpose, event_date, start_time, end_time) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [user_id, college_name, title, purpose, event_date, start_time, end_time]
-    );
+    let savedPoster = null;
+    let savedAttachment = null;
 
-    await logAudit(
-      'BOOKING_CREATED',
-      user_id,
-      result.insertId,
-      `${college_name} submitted booking for ${event_date}`
-    );
+    try {
+      if (poster) {
+        savedPoster = await saveBase64Upload(poster, 'poster');
+      }
 
-    res.status(201).json({
-      message: 'Booking request submitted successfully.',
-      bookingId: result.insertId,
-    });
+      if (attachment) {
+        savedAttachment = await saveBase64Upload(attachment, 'attachment');
+      }
+
+      const [result] = await db.query(
+        `INSERT INTO bookings
+        (user_id, college_name, title, purpose, event_date, start_time, end_time, poster_url, poster_name, attachment_url, attachment_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          user_id,
+          college_name,
+          normalizedTitle,
+          normalizedPurpose,
+          event_date,
+          start_time,
+          end_time,
+          savedPoster?.url || null,
+          savedPoster?.name || null,
+          savedAttachment?.url || null,
+          savedAttachment?.name || null,
+        ]
+      );
+
+      await logAudit(
+        'BOOKING_CREATED',
+        user_id,
+        result.insertId,
+        `${college_name} submitted booking for ${event_date}`
+      );
+
+      return res.status(201).json({
+        message: 'Booking request submitted successfully.',
+        bookingId: result.insertId,
+      });
+    } catch (err) {
+      await Promise.allSettled([
+        cleanupStoredAssets({ poster_url: savedPoster?.url }),
+        cleanupStoredAssets({ attachment_url: savedAttachment?.url }),
+      ]);
+
+      if (err.statusCode) {
+        return res.status(err.statusCode).json({ message: err.message });
+      }
+
+      throw err;
+    }
   } catch (err) {
     console.error('Create booking error:', err);
     res.status(500).json({ message: 'Server error.' });
@@ -66,6 +106,39 @@ const createBooking = async (req, res) => {
 };
 
 // ─── College User: Get own bookings ─────────────────────────────────────────
+// College User: Delete own booking (pending/rejected only)
+const deleteBooking = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      'SELECT * FROM bookings WHERE id = ? AND user_id = ?',
+      [id, req.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Booking not found.' });
+    }
+
+    const booking = rows[0];
+
+    await db.query('DELETE FROM bookings WHERE id = ? AND user_id = ?', [id, req.user.id]);
+    await cleanupStoredAssets(booking);
+
+    await logAudit(
+      'BOOKING_DELETED',
+      req.user.id,
+      id,
+      `${booking.college_name} deleted booking ${id}`
+    );
+
+    return res.json({ message: 'Booking deleted successfully.' });
+  } catch (err) {
+    console.error('Delete booking error:', err);
+    return res.status(500).json({ message: 'Server error.' });
+  }
+};
+
 const getMyBookings = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -85,7 +158,7 @@ const getApprovedBookings = async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      `SELECT id, title, college_name, event_date, start_time, end_time, purpose
+      `SELECT id, title, college_name, event_date, start_time, end_time, purpose, poster_url
        FROM bookings
        WHERE status = 'approved'
          AND event_date BETWEEN ? AND ?
@@ -242,6 +315,7 @@ const updateBookingStatus = async (req, res) => {
 
 module.exports = {
   createBooking,
+  deleteBooking,
   getMyBookings,
   getApprovedBookings,
   getAllBookings,

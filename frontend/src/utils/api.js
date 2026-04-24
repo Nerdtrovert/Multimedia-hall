@@ -14,6 +14,7 @@ api.interceptors.request.use((config) => {
 // Bookings - College
 export const submitBooking = (data) => api.post('/bookings', data);
 export const getMyBookings = () => api.get('/bookings/my');
+export const deleteMyBooking = (id) => api.delete(`/bookings/${id}`);
 
 // Bookings - Common
 export const getCalendarBookings = (start, end) =>
