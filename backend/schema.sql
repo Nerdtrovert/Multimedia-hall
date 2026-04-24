@@ -4,8 +4,6 @@
 CREATE DATABASE IF NOT EXISTS auditorium_db;
 USE auditorium_db;
 
-TRUNCATE TABLE audit_logs;
-
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -24,9 +22,17 @@ CREATE TABLE IF NOT EXISTS bookings (
   college_name VARCHAR(100) NOT NULL,
   title VARCHAR(200) NOT NULL,
   purpose TEXT,
+  poster_file_path VARCHAR(255),
+  poster_original_name VARCHAR(255),
+  poster_mime_type VARCHAR(100),
+  poster_uploaded_at TIMESTAMP NULL,
   event_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
+  event_report_file_path VARCHAR(255),
+  event_report_original_name VARCHAR(255),
+  event_report_mime_type VARCHAR(100),
+  event_report_uploaded_at TIMESTAMP NULL,
   status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
   admin_note TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -42,6 +48,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   target_booking_id INT,
   details TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Daily reminder log table (prevents duplicate reminder mails per booking/day)
+CREATE TABLE IF NOT EXISTS report_reminder_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  booking_id INT NOT NULL,
+  reminder_date DATE NOT NULL,
+  recipient_email VARCHAR(150) NOT NULL,
+  sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_booking_reminder_date (booking_id, reminder_date),
+  FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
 );
 
 -- Seed: Admin user (password: admin123)

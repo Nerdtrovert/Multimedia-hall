@@ -1,11 +1,35 @@
 const db = require('../config/db');
+const fs = require('fs');
+const path = require('path');
 const { sendStatusEmail } = require('../utils/mailer');
 const { logAudit } = require('../utils/audit');
+
+const uploadsRoot = path.join(__dirname, '..', 'uploads');
+
+const toDateKey = (dateValue) => {
+  if (!dateValue) return '';
+  if (dateValue instanceof Date) {
+    const year = dateValue.getFullYear();
+    const month = `${dateValue.getMonth() + 1}`.padStart(2, '0');
+    const day = `${dateValue.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(dateValue).split('T')[0];
+};
+
+const toApiPosterUrl = (posterPath) => (posterPath ? `/uploads/${posterPath.replace(/\\/g, '/')}` : null);
+
+const withFileLinks = (booking) => ({
+  ...booking,
+  poster_url: toApiPosterUrl(booking.poster_file_path),
+  event_report_url: booking.event_report_file_path ? `/api/bookings/${booking.id}/report` : null,
+});
 
 // ─── College User: Submit a booking request ─────────────────────────────────
 const createBooking = async (req, res) => {
   const { title, purpose, event_date, start_time, end_time } = req.body;
   const { id: user_id, college_name } = req.user;
+  const posterFile = req.file || null;
 
   if (!title || !event_date || !start_time || !end_time) {
     return res.status(400).json({
@@ -43,9 +67,21 @@ const createBooking = async (req, res) => {
 
     const [result] = await db.query(
       `INSERT INTO bookings 
-      (user_id, college_name, title, purpose, event_date, start_time, end_time) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [user_id, college_name, title, purpose, event_date, start_time, end_time]
+      (user_id, college_name, title, purpose, poster_file_path, poster_original_name, poster_mime_type, poster_uploaded_at, event_date, start_time, end_time) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user_id,
+        college_name,
+        title,
+        purpose,
+        posterFile ? `posters/${posterFile.filename}` : null,
+        posterFile ? posterFile.originalname : null,
+        posterFile ? posterFile.mimetype : null,
+        posterFile ? new Date() : null,
+        event_date,
+        start_time,
+        end_time,
+      ]
     );
 
     await logAudit(
@@ -72,7 +108,7 @@ const getMyBookings = async (req, res) => {
       'SELECT * FROM bookings WHERE user_id = ? ORDER BY event_date DESC',
       [req.user.id]
     );
-    res.json(rows);
+    res.json(rows.map(withFileLinks));
   } catch (err) {
     console.error('Get my bookings error:', err);
     res.status(500).json({ message: 'Server error.' });
@@ -136,7 +172,7 @@ const getAllBookings = async (req, res) => {
 
   try {
     const [rows] = await db.query(query, params);
-    res.json(rows);
+    res.json(rows.map(withFileLinks));
   } catch (err) {
     console.error('Get all bookings error:', err);
     res.status(500).json({ message: 'Server error.' });
@@ -153,9 +189,132 @@ const getPendingBookings = async (req, res) => {
        WHERE b.status = 'pending'
        ORDER BY b.created_at ASC`
     );
-    res.json(rows);
+    res.json(rows.map(withFileLinks));
   } catch (err) {
     console.error('Get pending bookings error:', err);
+    res.status(500).json({ message: 'Server error.' });
+  }
+};
+
+// ─── College User: Upload post-event report PDF ──────────────────────────────
+const uploadEventReport = async (req, res) => {
+  const { id } = req.params;
+  const reportFile = req.file;
+
+  if (!reportFile) {
+    return res.status(400).json({ message: 'Event report PDF is required.' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `SELECT id, user_id, status, event_date, end_time, event_report_file_path
+       FROM bookings
+       WHERE id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Booking not found.' });
+    }
+
+    const booking = rows[0];
+
+    if (booking.user_id !== req.user.id) {
+      return res.status(403).json({ message: 'You can only upload reports for your own bookings.' });
+    }
+
+    if (booking.status !== 'approved') {
+      return res.status(400).json({ message: 'Event report can only be uploaded for approved bookings.' });
+    }
+
+    const eventDate = toDateKey(booking.event_date);
+    const endTime = String(booking.end_time || '').slice(0, 8);
+    const eventEnd = new Date(`${eventDate}T${endTime}`);
+
+    if (Number.isNaN(eventEnd.getTime())) {
+      return res.status(400).json({ message: 'Invalid event date or end time for this booking.' });
+    }
+
+    if (new Date() < eventEnd) {
+      return res.status(400).json({ message: 'Event report upload is allowed only after the event has ended.' });
+    }
+
+    if (booking.event_report_file_path) {
+      const oldPath = path.join(uploadsRoot, booking.event_report_file_path);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    await db.query(
+      `UPDATE bookings
+       SET event_report_file_path = ?, event_report_original_name = ?, event_report_mime_type = ?, event_report_uploaded_at = ?
+       WHERE id = ?`,
+      [`reports/${reportFile.filename}`, reportFile.originalname, reportFile.mimetype, new Date(), id]
+    );
+
+    await logAudit(
+      'EVENT_REPORT_UPLOADED',
+      req.user.id,
+      id,
+      `Event report uploaded for booking ${id}`
+    );
+
+    res.json({ message: 'Event report uploaded successfully.', event_report_url: `/api/bookings/${id}/report` });
+  } catch (err) {
+    console.error('Upload event report error:', err);
+    res.status(500).json({ message: 'Server error.' });
+  }
+};
+
+// ─── Admin/Owner: View event report PDF ──────────────────────────────────────
+const getEventReport = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `SELECT id, user_id, event_report_file_path, event_report_original_name, event_report_mime_type
+       FROM bookings
+       WHERE id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Booking not found.' });
+    }
+
+    const booking = rows[0];
+    if (!booking.event_report_file_path) {
+      return res.status(404).json({ message: 'Event report not uploaded yet.' });
+    }
+
+    const isOwner = req.user.id === booking.user_id;
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ message: 'You are not authorized to access this report.' });
+    }
+
+    const filePath = path.join(uploadsRoot, booking.event_report_file_path);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'Stored event report file not found.' });
+    }
+
+    res.setHeader('Content-Type', booking.event_report_mime_type || 'application/pdf');
+    const shouldDownload = ['1', 'true', 'yes'].includes(
+      String(req.query.download || '').toLowerCase()
+    );
+    const dispositionMode = shouldDownload ? 'attachment' : 'inline';
+    res.setHeader(
+      'Content-Disposition',
+      `${dispositionMode}; filename="${encodeURIComponent(
+        booking.event_report_original_name || `event-report-${id}.pdf`
+      )}"`
+    );
+
+    res.sendFile(filePath);
+  } catch (err) {
+    console.error('Get event report error:', err);
     res.status(500).json({ message: 'Server error.' });
   }
 };
@@ -247,4 +406,6 @@ module.exports = {
   getAllBookings,
   getPendingBookings,
   updateBookingStatus,
+  uploadEventReport,
+  getEventReport,
 };

@@ -4,6 +4,14 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
 });
 
+const resolveApiOrigin = () => {
+  const configuredBase = import.meta.env.VITE_API_BASE_URL || '/api';
+  if (/^https?:\/\//i.test(configuredBase)) {
+    return configuredBase.replace(/\/api\/?$/, '');
+  }
+  return window.location.origin;
+};
+
 // Attach token from localStorage on every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
@@ -14,6 +22,11 @@ api.interceptors.request.use((config) => {
 // Bookings - College
 export const submitBooking = (data) => api.post('/bookings', data);
 export const getMyBookings = () => api.get('/bookings/my');
+export const uploadEventReport = (bookingId, file) => {
+  const formData = new FormData();
+  formData.append('event_report', file);
+  return api.post(`/bookings/${bookingId}/report`, formData);
+};
 
 // Bookings - Common
 export const getCalendarBookings = (start, end) =>
@@ -32,5 +45,50 @@ export const downloadPDF = (params) =>
 export const downloadExcel = (params) =>
   api.get('/reports/excel', { params, responseType: 'blob' });
 export const getAnalytics = () => api.get('/reports/analytics');
+
+export const toApiFileUrl = (relativePath) =>
+  relativePath ? `${resolveApiOrigin()}${relativePath}` : null;
+
+export const openProtectedFileInNewTab = async (protectedPath) => {
+  const response = await api.get(protectedPath, { responseType: 'blob' });
+  const contentType = response.headers?.['content-type'] || 'application/octet-stream';
+  const blob = new Blob([response.data], { type: contentType });
+  const objectUrl = URL.createObjectURL(blob);
+  window.open(objectUrl, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+};
+
+const parseFilenameFromDisposition = (contentDisposition, fallbackName) => {
+  if (!contentDisposition) return fallbackName;
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const plainMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+  return plainMatch?.[1] || fallbackName;
+};
+
+export const downloadProtectedFile = async (protectedPath, fallbackName = 'file.pdf') => {
+  const response = await api.get(protectedPath, { responseType: 'blob' });
+  const contentType = response.headers?.['content-type'] || 'application/octet-stream';
+  const contentDisposition = response.headers?.['content-disposition'];
+  const filename = parseFilenameFromDisposition(contentDisposition, fallbackName);
+
+  const blob = new Blob([response.data], { type: contentType });
+  const objectUrl = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = filename;
+  a.click();
+
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+};
 
 export default api;

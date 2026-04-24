@@ -44,6 +44,7 @@ const NewBooking = () => {
     event_date: '',
     start_time: '',
     end_time: '',
+    poster: null,
   });
   const [submitting, setSubmitting] = useState(false);
   const [bookingsByDate, setBookingsByDate] = useState({});
@@ -69,7 +70,12 @@ const NewBooking = () => {
   useEffect(() => {
     const loadBookings = async () => {
       try {
-        const res = await getCalendarBookings();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 1);
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 3);
+
+        const res = await getCalendarBookings(startDate.toISOString(), endDate.toISOString());
         const grouped = res.data.reduce((acc, booking) => {
           const dateKey = booking.event_date.split('T')[0];
 
@@ -117,7 +123,12 @@ const NewBooking = () => {
   });
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, files } = e.target;
+
+    if (name === 'poster') {
+      setForm((current) => ({ ...current, poster: files?.[0] || null }));
+      return;
+    }
 
     if (name === 'event_date') {
       setForm((current) => ({
@@ -156,7 +167,15 @@ const NewBooking = () => {
 
     setSubmitting(true);
     try {
-      await submitBooking(form);
+      const payload = new FormData();
+      payload.append('title', form.title);
+      payload.append('purpose', form.purpose);
+      payload.append('event_date', form.event_date);
+      payload.append('start_time', form.start_time);
+      payload.append('end_time', form.end_time);
+      if (form.poster) payload.append('poster', form.poster);
+
+      await submitBooking(payload);
       toast.success('Booking request submitted! You will be notified by email.');
       navigate('/user/my-bookings');
     } catch (err) {
@@ -198,6 +217,17 @@ const NewBooking = () => {
                 rows={3}
                 placeholder="Briefly describe the event..."
               />
+            </div>
+
+            <div className="form-group">
+              <label>Event Poster (Image)</label>
+              <input
+                type="file"
+                name="poster"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleChange}
+              />
+              <small className="form-help">Optional. Upload JPG, PNG, or WEBP (max 5 MB).</small>
             </div>
 
             <div className="form-group">

@@ -48,6 +48,27 @@
   margin: 0;
 }
 
+.request-poster {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.request-poster-image {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  display: block;
+}
+
+.poster-empty {
+  margin: 0;
+  padding: 12px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
 .request-meta {
   display: flex;
   gap: 14px;

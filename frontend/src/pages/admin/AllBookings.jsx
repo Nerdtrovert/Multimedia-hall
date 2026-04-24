@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getAllBookings } from '../../utils/api';
+import {
+  downloadProtectedFile,
+  getAllBookings,
+  openProtectedFileInNewTab,
+  toApiFileUrl,
+} from '../../utils/api';
+import { toast } from 'react-toastify';
 import Navbar from '../../components/common/Navbar';
 import PageBackButton from '../../components/common/PageBackButton';
 import StatusBadge from '../../components/common/StatusBadge';
@@ -35,6 +41,26 @@ const AllBookings = () => {
     const cleared = { college: '', status: '', from: '', to: '' };
     setFilters(cleared);
     setAppliedFilters(cleared);
+  };
+
+  const openReport = async (booking) => {
+    if (!booking.event_report_url) return;
+    try {
+      await openProtectedFileInNewTab(booking.event_report_url);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to open event report.');
+    }
+  };
+
+  const downloadReport = async (booking) => {
+    if (!booking.event_report_url) return;
+    const separator = booking.event_report_url.includes('?') ? '&' : '?';
+    const downloadPath = `${booking.event_report_url}${separator}download=1`;
+    try {
+      await downloadProtectedFile(downloadPath, `${booking.title || 'event'}-report.pdf`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to download event report.');
+    }
   };
 
   return (
@@ -80,24 +106,54 @@ const AllBookings = () => {
                   <th>Title</th>
                   <th>Date</th>
                   <th>Time</th>
-                  <th>Status</th>
-                  <th>Note</th>
-                  <th>Submitted By</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.length === 0 ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', color: '#9ca3af' }}>No records found.</td></tr>
-                ) : bookings.map((b) => (
-                  <tr key={b.id}>
+                   <th>Status</th>
+                   <th>Poster</th>
+                   <th>Event Report</th>
+                   <th>Note</th>
+                   <th>Submitted By</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 {bookings.length === 0 ? (
+                   <tr><td colSpan="9" style={{ textAlign: 'center', color: '#9ca3af' }}>No records found.</td></tr>
+                 ) : bookings.map((b) => (
+                   <tr key={b.id}>
                     <td><strong>{b.college_name}</strong></td>
                     <td>{b.title}</td>
                     <td>{new Date(b.event_date).toLocaleDateString()}</td>
-                    <td>{b.start_time} – {b.end_time}</td>
-                    <td><StatusBadge status={b.status} /></td>
-                    <td>{b.admin_note || <span style={{ color: '#9ca3af' }}>—</span>}</td>
-                    <td style={{ fontSize: '12px', color: '#6b7280' }}>{b.user_email}</td>
-                  </tr>
+                     <td>{b.start_time} – {b.end_time}</td>
+                     <td><StatusBadge status={b.status} /></td>
+                       <td>
+                         {b.poster_url ? (
+                           <div style={{ display: 'grid', gap: 6 }}>
+                             <a href={toApiFileUrl(b.poster_url)} target="_blank" rel="noopener noreferrer">
+                               <img src={toApiFileUrl(b.poster_url)} alt={`${b.title} poster`} className="table-poster-thumb" />
+                             </a>
+                             <a className="link-btn" href={toApiFileUrl(b.poster_url)} target="_blank" rel="noopener noreferrer">
+                               View poster
+                             </a>
+                           </div>
+                         ) : (
+                           <span style={{ color: '#9ca3af' }}>—</span>
+                         )}
+                       </td>
+                      <td>
+                        {b.event_report_url ? (
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            <button type="button" className="link-btn" onClick={() => openReport(b)}>
+                              View report
+                            </button>
+                            <button type="button" className="link-btn" onClick={() => downloadReport(b)}>
+                              Download report
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#9ca3af' }}>—</span>
+                        )}
+                     </td>
+                     <td>{b.admin_note || <span style={{ color: '#9ca3af' }}>—</span>}</td>
+                     <td style={{ fontSize: '12px', color: '#6b7280' }}>{b.user_email}</td>
+                   </tr>
                 ))}
               </tbody>
             </table>

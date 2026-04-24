@@ -108,7 +108,7 @@ const CalendarView = () => {
         <div className="calendar-day-number">{arg.dayNumberText}</div>
         {dayBookings.length > 0 && (
           <div className="calendar-day-bars">
-            {dayBookings.map((booking) => (
+            {dayBookings.map((booking, index) => (
               <span
                 key={booking.id}
                 className="calendar-day-bar"
@@ -117,6 +117,7 @@ const CalendarView = () => {
                   left: `${(booking.startMinutes / 1440) * 100}%`,
                   width: `${Math.max((booking.durationMinutes / 1440) * 100, 4)}%`,
                   backgroundColor: booking.color,
+                  top: `${index * 6}px`,
                 }}
               />
             ))}

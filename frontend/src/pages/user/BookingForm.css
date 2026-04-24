@@ -46,6 +46,11 @@
   color: #374151;
 }
 
+.form-help {
+  color: #6b7280;
+  font-size: 12px;
+}
+
 .form-group input,
 .form-group textarea,
 .form-group select {

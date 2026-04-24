@@ -6,7 +6,8 @@ const ExcelJS = require("exceljs");
 async function fetchBookingsForReport(filters, userId = null) {
   let query = `
     SELECT b.id, b.college_name, b.title, b.purpose, b.event_date,
-           b.start_time, b.end_time, b.status, b.admin_note, b.created_at
+           b.start_time, b.end_time, b.status, b.admin_note, b.created_at,
+           b.poster_file_path, b.event_report_file_path
     FROM bookings b
     WHERE 1=1
   `;
@@ -170,6 +171,7 @@ const generateExcel = async (req, res) => {
 
   try {
     const bookings = await fetchBookingsForReport(filters, userId);
+    const apiBaseUrl = `${req.protocol}://${req.get('host')}`;
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Bookings");
@@ -184,6 +186,8 @@ const generateExcel = async (req, res) => {
       { header: "End Time", key: "end_time", width: 12 },
       { header: "Status", key: "status", width: 12 },
       { header: "Admin Note", key: "admin_note", width: 30 },
+      { header: "Poster Link", key: "poster_url", width: 50 },
+      { header: "Post-Event Report Link", key: "event_report_url", width: 50 },
       { header: "Submitted At", key: "created_at", width: 20 },
     ];
 
@@ -196,7 +200,27 @@ const generateExcel = async (req, res) => {
     };
     sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
 
-    bookings.forEach((b) => sheet.addRow(b));
+    bookings.forEach((b) => {
+      const row = sheet.addRow({
+        ...b,
+        poster_url: b.poster_file_path ? `${apiBaseUrl}/uploads/${b.poster_file_path.replace(/\\/g, '/')}` : '',
+        event_report_url: b.event_report_file_path ? `${apiBaseUrl}/api/bookings/${b.id}/report` : '',
+      });
+
+      if (b.poster_file_path) {
+        row.getCell('poster_url').value = {
+          text: 'View poster',
+          hyperlink: `${apiBaseUrl}/uploads/${b.poster_file_path.replace(/\\/g, '/')}`,
+        };
+      }
+
+      if (b.event_report_file_path) {
+        row.getCell('event_report_url').value = {
+          text: 'View report',
+          hyperlink: `${apiBaseUrl}/api/bookings/${b.id}/report`,
+        };
+      }
+    });
 
     res.setHeader(
       "Content-Type",

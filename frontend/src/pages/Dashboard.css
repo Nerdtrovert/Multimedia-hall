@@ -186,6 +186,15 @@
   color: #374151;
 }
 
+.table-poster-thumb {
+  width: 80px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  display: block;
+}
+
 .bookings-table tr:hover td {
   background: #f9fafb;
 }
@@ -201,10 +210,19 @@
 }
 
 .link-btn {
+  background: none;
+  border: none;
+  padding: 0;
   color: #2d6a9f;
   text-decoration: none;
   font-weight: 600;
   font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
 }
 
 /* Filter bar */

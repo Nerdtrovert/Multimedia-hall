@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
+const path = require('path');
 const db = require('./config/db');
-require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 const seed = async () => {
   const adminPass = await bcrypt.hash('admin123', 10);
