@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS report_reminder_logs (
 
 -- Seed: Admin user (password: admin123)
 INSERT IGNORE INTO users (name, email, password, role) VALUES
-('System Admin', 'admin@auditorium.com', '$2a$10$YourHashedPasswordHere', 'admin');
+('System Admin', 'admin@auditorium.com', 'admin123', 'admin');
 
 -- Seed: College users (password: college123 for all)
 INSERT IGNORE INTO users (name, email, password, role, college_name) VALUES

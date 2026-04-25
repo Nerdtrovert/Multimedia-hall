@@ -65,6 +65,54 @@
   padding: 1px 4px;
 }
 
+.fc .fc-timegrid-event {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.fc .calendar-booking {
+  border-width: 2px;
+}
+
+.fc .fc-timegrid-event .fc-event-main {
+  padding: 6px 8px;
+}
+
+.fc .fc-timegrid-event .fc-event-main,
+.fc .fc-timegrid-event .fc-event-main-frame {
+  color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+.fc .fc-timegrid-event .fc-event-time {
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.fc .fc-timegrid-event .fc-event-title {
+  font-weight: 700;
+}
+
+.fc .fc-timegrid-event .fc-event-title-container,
+.fc .fc-timegrid-event .fc-event-main-frame {
+  overflow: visible;
+}
+
+.fc .fc-timegrid-event-harness {
+  margin: 2px 0;
+}
+
+.fc .fc-timegrid-slot-label {
+  font-size: 12px;
+  color: #475569;
+}
+
+.fc .fc-timegrid-now-indicator-line {
+  border-color: #ef4444;
+  border-width: 2px;
+}
+
 .fc .fc-scrollgrid {
   border-radius: 12px;
   overflow: hidden;
@@ -117,6 +165,33 @@
   opacity: 0.95;
   min-width: 6px;
   display: inline-block;
+}
+
+.calendar-event {
+  overflow: hidden;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.calendar-event__title {
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.calendar-event__meta {
+  font-size: 11px;
+  opacity: 0.95;
+  margin-top: 2px;
+}
+
+.calendar-event__time {
+  font-size: 11px;
+  opacity: 0.95;
+  margin-top: 2px;
+}
+
+.calendar-event--timegrid .calendar-event__title {
+  font-size: 13px;
 }
 
 /* Event detail modal */

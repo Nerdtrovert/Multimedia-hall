@@ -168,6 +168,8 @@ const CalendarView = () => {
             dayMaxEventRows={3}
             eventDisplay="block"
             displayEventTime={true}
+            dayCellContent={(arg) => (arg.view.type === 'dayGridMonth' ? renderDayCell(arg) : arg.dayNumberText)}
+            eventClassNames={() => ['calendar-booking']}
             eventTimeFormat={{
               hour: '2-digit',
               minute: '2-digit',
@@ -184,20 +186,14 @@ const CalendarView = () => {
                 minute: '2-digit',
               });
 
+              const isTimeGrid = eventInfo.view.type.startsWith('timeGrid');
+              const collegeName = eventInfo.event.extendedProps?.college_name;
+
               return (
-                <div
-                  style={{
-                    padding: '2px 4px',
-                    fontSize: '11px',
-                    lineHeight: '1.2',
-                    overflow: 'hidden',
-                    whiteSpace: 'normal',
-                  }}
-                >
-                  <div style={{ fontWeight: 600 }}>
-                    {eventInfo.event.title}
-                  </div>
-                  <div>
+                <div className={`calendar-event ${isTimeGrid ? 'calendar-event--timegrid' : 'calendar-event--daygrid'}`}>
+                  <div className="calendar-event__title">{eventInfo.event.title}</div>
+                  {collegeName && <div className="calendar-event__meta">{collegeName}</div>}
+                  <div className="calendar-event__time">
                     {startTime} - {endTime}
                   </div>
                 </div>
