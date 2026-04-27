@@ -4,10 +4,11 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useNavigate } from 'react-router-dom';
-import { getCalendarBookings } from '../utils/api';
+import { getCalendarBookings, openProtectedFileInNewTab, toApiFileUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/common/Navbar';
 import PageBackButton from '../components/common/PageBackButton';
+import { toast } from 'react-toastify';
 import './Calendar.css';
 
 const COLLEGE_COLORS = {
@@ -28,12 +29,19 @@ const toMinutes = (time) => {
   return hours * 60 + minutes;
 };
 
+const toDateParam = (value) => {
+  if (!value) return '';
+  if (value instanceof Date) return formatDateKey(value);
+  return String(value).split('T')[0];
+};
+
 const CalendarView = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [bookingsByDate, setBookingsByDate] = useState({});
+  const todayDate = formatDateKey(new Date());
 
   useEffect(() => {
     const now = new Date();
@@ -41,14 +49,15 @@ const CalendarView = () => {
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    fetchBookings(start.toISOString(), end.toISOString());
+    fetchBookings(toDateParam(start), toDateParam(end));
   }, []);
 
   const fetchBookings = async (startDate, endDate) => {
     try {
       const res = await getCalendarBookings(startDate, endDate);
       const grouped = res.data.reduce((acc, booking) => {
-        const dateKey = booking.event_date.split('T')[0];
+        const eventDate = toDateParam(booking.event_date);
+        const dateKey = eventDate;
         const startMinutes = toMinutes(booking.start_time);
         const endMinutes = toMinutes(booking.end_time);
 
@@ -70,15 +79,18 @@ const CalendarView = () => {
         items.sort((a, b) => a.startMinutes - b.startMinutes);
       });
 
-      const mapped = res.data.map((booking) => ({
-        id: booking.id,
-        title: booking.title,
-        start: `${booking.event_date.split('T')[0]}T${booking.start_time}`,
-        end: `${booking.event_date.split('T')[0]}T${booking.end_time}`,
-        backgroundColor: COLLEGE_COLORS[booking.college_name] || '#6366f1',
-        borderColor: COLLEGE_COLORS[booking.college_name] || '#6366f1',
-        extendedProps: booking,
-      }));
+      const mapped = res.data.map((booking) => {
+        const eventDate = toDateParam(booking.event_date);
+        return {
+          id: booking.id,
+          title: booking.title,
+          start: `${eventDate}T${booking.start_time}`,
+          end: `${eventDate}T${booking.end_time}`,
+          backgroundColor: COLLEGE_COLORS[booking.college_name] || '#6366f1',
+          borderColor: COLLEGE_COLORS[booking.college_name] || '#6366f1',
+          extendedProps: booking,
+        };
+      });
 
       setBookingsByDate(grouped);
       setEvents(mapped);
@@ -94,9 +106,22 @@ const CalendarView = () => {
   const handleDateClick = (info) => {
     if (user?.role !== 'college') return;
     const selectedDate = info.dateStr.split('T')[0];
+    if (selectedDate < todayDate) {
+      toast.error('Past dates are disabled for new bookings.');
+      return;
+    }
     navigate(`/user/new-booking?date=${selectedDate}`, {
       state: { selectedDate },
     });
+  };
+
+  const openEventReport = async (eventReportUrl) => {
+    if (!eventReportUrl) return;
+    try {
+      await openProtectedFileInNewTab(eventReportUrl);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to open event report.');
+    }
   };
 
   const renderDayCell = (arg) => {
@@ -131,7 +156,9 @@ const CalendarView = () => {
     <div>
       <Navbar />
       <div className="calendar-page">
-        <PageBackButton fallback={user?.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'} />
+        <PageBackButton
+          fallback={['admin', 'supervisor'].includes(user?.role) ? '/admin/dashboard' : '/user/dashboard'}
+        />
         <div className="page-header">
           <h2>Auditorium Calendar</h2>
           <p>All confirmed bookings are shown below. Click a date to start a booking.</p>
@@ -151,7 +178,7 @@ const CalendarView = () => {
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             datesSet={(arg) => {
-              fetchBookings(arg.startStr, arg.endStr);
+              fetchBookings(toDateParam(arg.start), toDateParam(arg.end));
             }}
             headerToolbar={{
               left: 'prev,next today',
@@ -161,6 +188,7 @@ const CalendarView = () => {
             events={events}
             eventClick={handleEventClick}
             dateClick={handleDateClick}
+            validRange={user?.role === 'college' ? { start: todayDate } : undefined}
             fixedWeekCount={false}
             contentHeight={780}
             aspectRatio={1.65}
@@ -213,9 +241,30 @@ const CalendarView = () => {
               <h3>{selectedEvent.title}</h3>
               <div className="event-details">
                 <p><strong>College:</strong> {selectedEvent.college_name}</p>
-                <p><strong>Date:</strong> {new Date(selectedEvent.event_date).toDateString()}</p>
+                <p><strong>Date:</strong> {toDateParam(selectedEvent.event_date)}</p>
                 <p><strong>Time:</strong> {selectedEvent.start_time} - {selectedEvent.end_time}</p>
                 {selectedEvent.purpose && <p><strong>Purpose:</strong> {selectedEvent.purpose}</p>}
+                {selectedEvent.poster_url && (
+                  <p>
+                    <strong>Poster:</strong>{' '}
+                    <a href={toApiFileUrl(selectedEvent.poster_url)} target="_blank" rel="noopener noreferrer">
+                      View poster
+                    </a>
+                  </p>
+                )}
+                {selectedEvent.event_report_url && (
+                  <p>
+                    <strong>Event report:</strong>{' '}
+                    <button
+                      type="button"
+                      className="link-btn"
+                      style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                      onClick={() => openEventReport(selectedEvent.event_report_url)}
+                    >
+                      View report
+                    </button>
+                  </p>
+                )}
               </div>
             </div>
           </div>

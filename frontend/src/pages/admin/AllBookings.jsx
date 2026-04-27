@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  cancelApprovedBooking,
   downloadProtectedFile,
   getAllBookings,
   openProtectedFileInNewTab,
@@ -16,6 +17,7 @@ import './AllBookings.css';
 const AllBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
   const [filters, setFilters] = useState({ college: '', status: '', from: '', to: '' });
   const [appliedFilters, setAppliedFilters] = useState({ college: '', status: '', from: '', to: '' });
 
@@ -60,6 +62,26 @@ const AllBookings = () => {
       await downloadProtectedFile(downloadPath, `${booking.title || 'event'}-report.pdf`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to download event report.');
+    }
+  };
+
+  const handleAdminCancel = async (booking) => {
+    const note = window.prompt(
+      `Cancel approved booking "${booking.title}"?\nOptional note (shown to user):`,
+      'Approved booking cancelled by admin.'
+    );
+
+    if (note === null) return;
+
+    setCancellingId(booking.id);
+    try {
+      await cancelApprovedBooking(booking.id, note);
+      toast.success('Approved booking cancelled.');
+      await fetchBookings(appliedFilters, false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to cancel approved booking.');
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -109,15 +131,16 @@ const AllBookings = () => {
                    <th>Status</th>
                    <th>Poster</th>
                    <th>Event Report</th>
-                   <th>Note</th>
-                   <th>Submitted By</th>
-                 </tr>
-               </thead>
-               <tbody>
-                 {bookings.length === 0 ? (
-                   <tr><td colSpan="9" style={{ textAlign: 'center', color: '#9ca3af' }}>No records found.</td></tr>
-                 ) : bookings.map((b) => (
-                   <tr key={b.id}>
+                    <th>Note</th>
+                    <th>Submitted By</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookings.length === 0 ? (
+                    <tr><td colSpan="10" style={{ textAlign: 'center', color: '#9ca3af' }}>No records found.</td></tr>
+                  ) : bookings.map((b) => (
+                    <tr key={b.id}>
                     <td><strong>{b.college_name}</strong></td>
                     <td>{b.title}</td>
                     <td>{new Date(b.event_date).toLocaleDateString()}</td>
@@ -151,10 +174,25 @@ const AllBookings = () => {
                           <span style={{ color: '#9ca3af' }}>—</span>
                         )}
                      </td>
-                     <td>{b.admin_note || <span style={{ color: '#9ca3af' }}>—</span>}</td>
-                     <td style={{ fontSize: '12px', color: '#6b7280' }}>{b.user_email}</td>
-                   </tr>
-                ))}
+                      <td>{b.admin_note || <span style={{ color: '#9ca3af' }}>—</span>}</td>
+                      <td style={{ fontSize: '12px', color: '#6b7280' }}>{b.user_email}</td>
+                      <td>
+                        {b.status === 'approved' ? (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => handleAdminCancel(b)}
+                            disabled={cancellingId === b.id}
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                          >
+                            {cancellingId === b.id ? 'Cancelling...' : 'Cancel booking'}
+                          </button>
+                        ) : (
+                          <span style={{ color: '#9ca3af' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                 ))}
               </tbody>
             </table>
           </div>

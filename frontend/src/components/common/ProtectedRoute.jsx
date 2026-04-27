@@ -6,8 +6,10 @@ const ProtectedRoute = ({ children, role }) => {
 
   if (loading) return <div className="loading-screen">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (role && user.role !== role) {
-    return <Navigate to={user.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'} replace />;
+  const allowedRoles = Array.isArray(role) ? role : role ? [role] : [];
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    const fallback = ['admin', 'supervisor'].includes(user.role) ? '/admin/dashboard' : '/user/dashboard';
+    return <Navigate to={fallback} replace />;
   }
 
   return children;

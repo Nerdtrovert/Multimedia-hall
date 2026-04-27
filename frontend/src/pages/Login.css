@@ -90,6 +90,20 @@
   cursor: not-allowed;
 }
 
+.forgot-password-link {
+  margin-top: 6px;
+  text-align: right;
+  color: #1e3a5f;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.forgot-password-link:hover {
+  color: #2d6a9f;
+  text-decoration: underline;
+}
+
 .login-hints {
   margin-top: 24px;
   padding: 16px;

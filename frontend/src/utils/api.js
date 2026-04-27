@@ -19,9 +19,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Auth
+export const forgotPassword = (email) => api.post('/auth/forgot-password', { email });
+export const changePassword = (oldPassword, newPassword) =>
+  api.post('/auth/change-password', { oldPassword, newPassword });
+
 // Bookings - College
 export const submitBooking = (data) => api.post('/bookings', data);
 export const getMyBookings = () => api.get('/bookings/my');
+export const cancelBookingRequest = (bookingId) => api.delete(`/bookings/${bookingId}`);
 export const uploadEventReport = (bookingId, file) => {
   const formData = new FormData();
   formData.append('event_report', file);
@@ -38,6 +44,8 @@ export const getAllBookings = (params) => api.get('/bookings', { params });
 export const getPendingBookings = () => api.get('/bookings/pending');
 export const updateBookingStatus = (id, status, admin_note) =>
   api.patch(`/bookings/${id}/status`, { status, admin_note });
+export const cancelApprovedBooking = (id, admin_note) =>
+  api.patch(`/bookings/${id}/cancel`, { admin_note });
 
 // Reports
 export const downloadPDF = (params) =>
@@ -45,6 +53,8 @@ export const downloadPDF = (params) =>
 export const downloadExcel = (params) =>
   api.get('/reports/excel', { params, responseType: 'blob' });
 export const getAnalytics = () => api.get('/reports/analytics');
+export const downloadActionLogs = () =>
+  api.get('/reports/action-logs/download', { responseType: 'blob' });
 
 export const toApiFileUrl = (relativePath) =>
   relativePath ? `${resolveApiOrigin()}${relativePath}` : null;

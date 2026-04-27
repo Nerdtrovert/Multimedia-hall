@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(100) NOT NULL,
   email VARCHAR(150) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
-  role ENUM('admin', 'college') NOT NULL DEFAULT 'college',
-  college_name VARCHAR(100),  -- NULL for admin
+  role ENUM('admin', 'supervisor', 'college') NOT NULL DEFAULT 'college',
+  college_name VARCHAR(100),  -- NULL for admin/supervisor
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   event_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
+  event_report_data LONGBLOB,
   event_report_file_path VARCHAR(255),
   event_report_original_name VARCHAR(255),
   event_report_mime_type VARCHAR(100),
@@ -72,3 +73,7 @@ INSERT IGNORE INTO users (name, email, password, role, college_name) VALUES
 ('College C Rep', 'college_c@edu.com', '$2a$10$YourHashedPasswordHere', 'college', 'College C');
 
 -- Note: Run the seed script (npm run seed) to insert users with properly hashed passwords
+
+-- For existing databases, run this migration once:
+-- ALTER TABLE bookings ADD COLUMN event_report_data LONGBLOB NULL AFTER end_time;
+-- ALTER TABLE users MODIFY COLUMN role ENUM('admin','supervisor','college') NOT NULL DEFAULT 'college';

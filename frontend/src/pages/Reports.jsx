@@ -8,7 +8,7 @@ import './Reports.css';
 
 const Reports = () => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = ['admin', 'supervisor'].includes(user?.role);
   const [filters, setFilters] = useState({ college: '', status: '', from: '', to: '' });
   const [loading, setLoading] = useState({ pdf: false, excel: false });
 
@@ -27,12 +27,15 @@ const Reports = () => {
     setLoading((prev) => ({ ...prev, [type]: true }));
 
     try {
-      const params = isAdmin
+      const rawParams = isAdmin
         ? filters
         : {
             from: filters.from,
             to: filters.to,
           };
+      const params = Object.fromEntries(
+        Object.entries(rawParams).filter(([, value]) => String(value || '').trim() !== '')
+      );
 
       const res =
         type === 'pdf'
@@ -67,7 +70,7 @@ const Reports = () => {
         <PageBackButton fallback={isAdmin ? '/admin/dashboard' : '/user/dashboard'} />
         <div className="page-header">
           <h2>📊 Reports</h2>
-          <p>Export booking data as PDF or Excel.</p>
+          <p>Export booking data as PDF or Excel, including event description and poster/report links when available.</p>
         </div>
 
         <div className="reports-card">

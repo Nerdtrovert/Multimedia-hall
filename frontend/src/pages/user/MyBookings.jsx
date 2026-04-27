@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  cancelBookingRequest,
   downloadProtectedFile,
   getMyBookings,
   openProtectedFileInNewTab,
@@ -27,6 +28,7 @@ const MyBookings = () => {
   const [loading, setLoading] = useState(true);
   const [selectedReportFiles, setSelectedReportFiles] = useState({});
   const [uploadingBookingId, setUploadingBookingId] = useState(null);
+  const [cancellingBookingId, setCancellingBookingId] = useState(null);
 
   const fetchBookings = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -99,6 +101,22 @@ const MyBookings = () => {
     }
   };
 
+  const cancelRequest = async (booking) => {
+    const confirmed = window.confirm(`Cancel "${booking.title}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setCancellingBookingId(booking.id);
+    try {
+      await cancelBookingRequest(booking.id);
+      toast.success('Booking request cancelled.');
+      await fetchBookings(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to cancel booking request.');
+    } finally {
+      setCancellingBookingId(null);
+    }
+  };
+
   return (
     <div>
       <Navbar />
@@ -124,10 +142,11 @@ const MyBookings = () => {
                   <th>Time</th>
                   <th>Status</th>
                   <th>Poster</th>
-                  <th>Event Report</th>
-                  <th>Admin Note</th>
-                  <th>Submitted</th>
-                </tr>
+                   <th>Event Report</th>
+                   <th>Actions</th>
+                   <th>Admin Note</th>
+                   <th>Submitted</th>
+                 </tr>
               </thead>
               <tbody>
                 {bookings.map((b, i) => (
@@ -189,6 +208,21 @@ const MyBookings = () => {
                           <span style={{ color: '#9ca3af', fontSize: 12 }}>Available only for approved events.</span>
                         )}
                       </div>
+                     </td>
+                    <td>
+                      {b.status === 'pending' ? (
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => cancelRequest(b)}
+                          disabled={cancellingBookingId === b.id}
+                          style={{ padding: '6px 10px', fontSize: 12 }}
+                        >
+                          {cancellingBookingId === b.id ? 'Cancelling...' : 'Cancel request'}
+                        </button>
+                      ) : (
+                        <span style={{ color: '#9ca3af' }}>—</span>
+                      )}
                     </td>
                     <td>{b.admin_note || <span style={{ color: '#9ca3af' }}>—</span>}</td>
                     <td>{new Date(b.created_at).toLocaleDateString()}</td>

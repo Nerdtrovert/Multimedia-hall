@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const bookingRoutes = require('./routes/bookings');
 const reportRoutes = require('./routes/reports');
 const { startPostReportReminderScheduler } = require('./services/reportReminderScheduler');
+const { actionLogger } = require('./middleware/actionLogger');
 
 const app = express();
 
@@ -16,7 +17,8 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
-app.use('/uploads/posters', express.static(path.join(__dirname, 'uploads', 'posters')));
+app.use(actionLogger);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);

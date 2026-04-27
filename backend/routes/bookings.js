@@ -6,6 +6,8 @@ const {
   getApprovedBookings,
   getAllBookings,
   getPendingBookings,
+  cancelMyBooking,
+  cancelApprovedBooking,
   updateBookingStatus,
   uploadEventReport,
   getEventReport,
@@ -19,6 +21,7 @@ router.get('/calendar', authenticate, getApprovedBookings);
 // College routes
 router.post('/', authenticate, authorizeCollege, uploadPoster.single('poster'), createBooking);
 router.get('/my', authenticate, authorizeCollege, getMyBookings);
+router.delete('/:id', authenticate, authorizeCollege, cancelMyBooking);
 router.post('/:id/report', authenticate, authorizeCollege, uploadReport.single('event_report'), uploadEventReport);
 router.get('/:id/report', authenticate, getEventReport);
 
@@ -26,5 +29,6 @@ router.get('/:id/report', authenticate, getEventReport);
 router.get('/', authenticate, authorizeAdmin, getAllBookings);
 router.get('/pending', authenticate, authorizeAdmin, getPendingBookings);
 router.patch('/:id/status', authenticate, authorizeAdmin, updateBookingStatus);
+router.patch('/:id/cancel', authenticate, authorizeAdmin, cancelApprovedBooking);
 
 module.exports = router;

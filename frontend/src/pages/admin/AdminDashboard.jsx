@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getPendingBookings, getAnalytics } from '../../utils/api';
+import { toast } from 'react-toastify';
+import { getPendingBookings, getAnalytics, downloadActionLogs } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/common/Navbar';
 import StatusBadge from '../../components/common/StatusBadge';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
 import '../Dashboard.css';
 
 const AdminDashboard = () => {
+  const { user } = useAuth();
+  const isSupervisor = user?.role === 'supervisor';
   const [pending, setPending] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [downloadingLogs, setDownloadingLogs] = useState(false);
 
   const fetchDashboardData = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -26,6 +31,25 @@ const AdminDashboard = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
   useAutoRefresh(() => fetchDashboardData(false), 10000);
+
+  const handleDownloadActionLogs = async () => {
+    setDownloadingLogs(true);
+    try {
+      const res = await downloadActionLogs();
+      const blob = new Blob([res.data], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `actions-${new Date().toISOString().slice(0, 10)}.log`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Action log downloaded.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to download action log.');
+    } finally {
+      setDownloadingLogs(false);
+    }
+  };
 
   return (
     <div>
@@ -73,6 +97,20 @@ const AdminDashboard = () => {
               <p>Export with filters</p>
             </div>
           </Link>
+          {isSupervisor && (
+            <button
+              type="button"
+              className="action-card action-card-button"
+              onClick={handleDownloadActionLogs}
+              disabled={downloadingLogs}
+            >
+              <span className="action-icon">🧾</span>
+              <div>
+                <strong>{downloadingLogs ? 'Downloading...' : 'Download Action Logs'}</strong>
+                <p>Supervisor-only accountability log export</p>
+              </div>
+            </button>
+          )}
         </div>
 
         <div className="recent-section">

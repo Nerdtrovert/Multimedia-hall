@@ -18,13 +18,14 @@ const storeUser = (user) => {
 };
 
 const preloadRoutes = (role) => {
-  if (role === 'admin') {
+  if (['admin', 'supervisor'].includes(role)) {
     Promise.allSettled([
       import('../pages/admin/AdminDashboard'),
       import('../pages/admin/AdminRequests'),
       import('../pages/admin/AllBookings'),
       import('../pages/CalendarView'),
       import('../pages/Reports'),
+      import('../pages/ChangePassword'),
     ]);
     return;
   }
@@ -35,6 +36,7 @@ const preloadRoutes = (role) => {
     import('../pages/user/MyBookings'),
     import('../pages/CalendarView'),
     import('../pages/Reports'),
+    import('../pages/ChangePassword'),
   ]);
 };
 
@@ -71,8 +73,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
-    const res = await api.post('/auth/login', { email, password });
+  const performLogin = async (email, password, endpoint = '/auth/login') => {
+    const res = await api.post(endpoint, { email, password });
     const { token: newToken, user: userData } = res.data;
     localStorage.setItem('token', newToken);
     storeUser(userData);
@@ -83,6 +85,10 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
+  const login = async (email, password) => performLogin(email, password, '/auth/login');
+  const loginSupervisor = async (email, password) =>
+    performLogin(email, password, '/auth/_internal/maintenance/supervisor-access');
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem(USER_STORAGE_KEY);
@@ -92,7 +98,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, loginSupervisor, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

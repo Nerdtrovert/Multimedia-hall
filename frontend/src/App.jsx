@@ -7,6 +7,9 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
 const Login = lazy(() => import('./pages/Login'));
+const SupervisorLogin = lazy(() => import('./pages/SupervisorLogin'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const CalendarView = lazy(() => import('./pages/CalendarView'));
 const Reports = lazy(() => import('./pages/Reports'));
 const UserDashboard = lazy(() => import('./pages/user/UserDashboard'));
@@ -25,6 +28,8 @@ function App() {
         <Suspense fallback={<div className="loading-screen">Loading...</div>}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/_maintenance/supervisor-access-portal" element={<SupervisorLogin />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
 
             <Route path="/user/dashboard" element={
@@ -42,21 +47,27 @@ function App() {
             <Route path="/user/reports" element={
               <ProtectedRoute role="college"><Reports /></ProtectedRoute>
             } />
+            <Route path="/user/change-password" element={
+              <ProtectedRoute role="college"><ChangePassword /></ProtectedRoute>
+            } />
 
             <Route path="/admin/dashboard" element={
-              <ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>
+              <ProtectedRoute role={['admin', 'supervisor']}><AdminDashboard /></ProtectedRoute>
             } />
             <Route path="/admin/requests" element={
-              <ProtectedRoute role="admin"><AdminRequests /></ProtectedRoute>
+              <ProtectedRoute role={['admin', 'supervisor']}><AdminRequests /></ProtectedRoute>
             } />
             <Route path="/admin/all-bookings" element={
-              <ProtectedRoute role="admin"><AllBookings /></ProtectedRoute>
+              <ProtectedRoute role={['admin', 'supervisor']}><AllBookings /></ProtectedRoute>
             } />
             <Route path="/admin/calendar" element={
-              <ProtectedRoute role="admin"><CalendarView /></ProtectedRoute>
+              <ProtectedRoute role={['admin', 'supervisor']}><CalendarView /></ProtectedRoute>
             } />
             <Route path="/admin/reports" element={
-              <ProtectedRoute role="admin"><Reports /></ProtectedRoute>
+              <ProtectedRoute role={['admin', 'supervisor']}><Reports /></ProtectedRoute>
+            } />
+            <Route path="/admin/change-password" element={
+              <ProtectedRoute role={['admin', 'supervisor']}><ChangePassword /></ProtectedRoute>
             } />
 
             <Route path="*" element={<Navigate to="/login" replace />} />

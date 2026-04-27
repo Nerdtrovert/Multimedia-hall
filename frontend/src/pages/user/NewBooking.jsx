@@ -34,6 +34,14 @@ const hasOverlap = (startMinutes, endMinutes, ranges) =>
 
 const normalizeDate = (value) => (value ? value.split('T')[0] : '');
 
+const getTodayKey = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, '0');
+  const day = `${now.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const NewBooking = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,7 +57,7 @@ const NewBooking = () => {
   const [submitting, setSubmitting] = useState(false);
   const [bookingsByDate, setBookingsByDate] = useState({});
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayKey();
   const timeSlots = useMemo(buildTimeSlots, []);
 
   useEffect(() => {
@@ -71,11 +79,10 @@ const NewBooking = () => {
     const loadBookings = async () => {
       try {
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 1);
         const endDate = new Date();
         endDate.setMonth(endDate.getMonth() + 3);
 
-        const res = await getCalendarBookings(startDate.toISOString(), endDate.toISOString());
+        const res = await getCalendarBookings(normalizeDate(startDate.toISOString()), normalizeDate(endDate.toISOString()));
         const grouped = res.data.reduce((acc, booking) => {
           const dateKey = booking.event_date.split('T')[0];
 
@@ -157,6 +164,11 @@ const NewBooking = () => {
 
     if (form.start_time >= form.end_time) {
       toast.error('End time must be after start time.');
+      return;
+    }
+
+    if (form.event_date < today) {
+      toast.error('Bookings cannot be created for past dates.');
       return;
     }
 

@@ -132,6 +132,14 @@ npm run seed
 # From the root directory
 ```
 
+### 🔁 One-command reset + seed
+
+```bash
+npm run db:reset:seed
+```
+
+This drops and recreates the database schema, then seeds login users again.
+
 This creates:
 | Email | Password | Role |
 |-------|----------|------|
@@ -139,6 +147,11 @@ This creates:
 | college_a@edu.com | college123 | College A |
 | college_b@edu.com | college123 | College B |
 | college_c@edu.com | college123 | College C |
+
+Supervisor account is also seeded for maintenance/emergency use only:
+- Email is set from `SUPERVISOR_EMAIL` (default: `supervisor@auditorium.com`)
+- Password comes from `SUPERVISOR_PASSWORD`, or auto-generated one-time during seed
+- Supervisor can sign in only via hidden route: `/_maintenance/supervisor-access-portal`
 
 ### 5. Run the App
 
@@ -157,6 +170,9 @@ Open [http://localhost:3000](http://localhost:3000)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/auth/login` | Login, returns JWT |
+| POST | `/api/auth/_internal/maintenance/supervisor-access` | Hidden supervisor login |
+| POST | `/api/auth/forgot-password` | Sends temporary password via email |
+| POST | `/api/auth/change-password` | Change password (authenticated) |
 | GET | `/api/auth/me` | Get current user |
 
 ### Bookings
@@ -177,6 +193,7 @@ Open [http://localhost:3000](http://localhost:3000)
 | GET | `/api/reports/pdf` | Download PDF |
 | GET | `/api/reports/excel` | Download Excel |
 | GET | `/api/reports/analytics` | Usage stats (admin) |
+| GET | `/api/reports/action-logs/download` | Download server action log (supervisor only) |
 
 ---
 
@@ -184,7 +201,7 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ```
 users
-  id, name, email, password (bcrypt), role (admin|college), college_name
+  id, name, email, password (bcrypt), role (admin|supervisor|college), college_name
 
 bookings
   id, user_id (FK), college_name, title, purpose,
@@ -198,6 +215,9 @@ audit_logs
   id, action, performed_by (FK), target_booking_id (FK),
   details, created_at
 ```
+
+Server file-based action log:
+- `backend/logs/actions.log` stores JSON-line entries for API actions (user/admin/supervisor).
 
 ---
 

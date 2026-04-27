@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import './Login.css';
 
-const Login = () => {
-  const { login } = useAuth();
+const SupervisorLogin = () => {
+  const { loginSupervisor } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -14,11 +14,11 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const user = await login(form.email, form.password);
-      toast.success(`Welcome, ${user.name}!`);
-      navigate(['admin', 'supervisor'].includes(user.role) ? '/admin/dashboard' : '/user/dashboard');
+      const user = await loginSupervisor(form.email, form.password);
+      toast.success(`Maintenance access granted. Welcome, ${user.name}.`);
+      navigate('/admin/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed.');
+      toast.error(err.response?.data?.message || 'Maintenance login failed.');
     } finally {
       setLoading(false);
     }
@@ -28,9 +28,9 @@ const Login = () => {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <div className="login-icon">🏛️</div>
-          <h1>Auditorium Booking</h1>
-          <p>Sign in to continue</p>
+          <div className="login-icon">🛠️</div>
+          <h1>Maintenance Access</h1>
+          <p>Supervisor emergency login</p>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
@@ -38,7 +38,7 @@ const Login = () => {
             <label>Email</label>
             <input
               type="email"
-              placeholder="your@email.com"
+              placeholder="supervisor@email.com"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               required
@@ -57,14 +57,10 @@ const Login = () => {
           <button type="submit" className="btn-login" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
-
-          <Link to="/forgot-password" className="forgot-password-link">
-            Forgot password?
-          </Link>
         </form>
       </div>
     </div>
   );
 };
 
-export default Login;
+export default SupervisorLogin;

@@ -4,9 +4,7 @@ const multer = require('multer');
 
 const uploadsRoot = path.join(__dirname, '..', 'uploads');
 const posterDir = path.join(uploadsRoot, 'posters');
-const reportDir = path.join(uploadsRoot, 'reports');
-
-[uploadsRoot, posterDir, reportDir].forEach((dir) => {
+[uploadsRoot, posterDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -39,7 +37,7 @@ const uploadPoster = multer({
 });
 
 const uploadReport = multer({
-  storage: createStorage(reportDir),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype !== 'application/pdf') {

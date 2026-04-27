@@ -133,6 +133,19 @@
   margin: 0;
 }
 
+.action-card-button {
+  width: 100%;
+  border: 2px solid transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.action-card-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 /* Recent section */
 .recent-section {
   background: white;

@@ -11,7 +11,7 @@ const Navbar = () => {
     navigate('/login');
   };
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = ['admin', 'supervisor'].includes(user?.role);
   const base = isAdmin ? '/admin' : '/user';
 
   return (
@@ -29,12 +29,13 @@ const Navbar = () => {
         {isAdmin && <Link to="/admin/requests">Requests</Link>}
         {isAdmin && <Link to="/admin/all-bookings">All Bookings</Link>}
         <Link to={`${base}/reports`}>Reports</Link>
+        <Link to={`${base}/change-password`}>Change Password</Link>
       </div>
 
       <div className="navbar-user">
         <span className="user-info">
           <span className={`role-badge ${isAdmin ? 'admin' : 'college'}`}>
-            {isAdmin ? 'Admin' : user?.college_name}
+            {isAdmin ? (user?.role === 'supervisor' ? 'Supervisor' : 'Admin') : user?.college_name}
           </span>
           {user?.name}
         </span>
