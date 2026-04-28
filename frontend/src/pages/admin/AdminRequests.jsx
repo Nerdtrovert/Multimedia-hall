@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getPendingBookings, updateBookingStatus } from '../../utils/api';
+import { getPendingBookings, toApiFileUrl, updateBookingStatus } from '../../utils/api';
 import { toast } from 'react-toastify';
 import Navbar from '../../components/common/Navbar';
 import PageBackButton from '../../components/common/PageBackButton';
@@ -37,7 +37,7 @@ const AdminRequests = () => {
     setSubmitting(true);
     try {
       await updateBookingStatus(modal.booking.id, modal.action, note);
-      toast.success(`Booking ${modal.action} successfully. Email sent to college.`);
+      toast.success(`Booking ${modal.action} successfully. Email and app notification sent.`);
       setModal(null);
       fetchPending(false);
     } catch (err) {
@@ -77,6 +77,15 @@ const AdminRequests = () => {
                 </div>
                 <h3 className="request-title">{b.title}</h3>
                 {b.purpose && <p className="request-purpose">{b.purpose}</p>}
+                <div className="request-poster">
+                  {b.poster_url ? (
+                    <a href={toApiFileUrl(b.poster_url)} target="_blank" rel="noopener noreferrer">
+                      <img src={toApiFileUrl(b.poster_url)} alt={`${b.title} poster`} className="request-poster-image" />
+                    </a>
+                  ) : (
+                    <p className="poster-empty">No poster uploaded.</p>
+                  )}
+                </div>
                 <div className="request-meta">
                   <span>📅 {new Date(b.event_date).toDateString()}</span>
                   <span>🕐 {b.start_time} – {b.end_time}</span>

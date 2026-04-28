@@ -17,7 +17,6 @@ auditorium-booking/
 │   │   └── reportController.js    # PDF, Excel, analytics
 │   ├── middleware/
 │   │   └── auth.js                # JWT verify, role guards
-│   ├── models/                    # (extend here for ORM later)
 │   ├── routes/
 │   │   ├── auth.js
 │   │   ├── bookings.js
@@ -32,8 +31,10 @@ auditorium-booking/
 │   └── package.json
 │
 ├── frontend/
+│   ├── index.html
 │   ├── public/
-│   │   └── index.html
+│   │   ├── favicon.png
+│   │   └── icons/
 │   └── src/
 │       ├── components/
 │       │   └── common/
@@ -57,7 +58,7 @@ auditorium-booking/
 │       ├── utils/
 │       │   └── api.js               # All Axios API calls
 │       ├── App.jsx                  # Routes + providers
-│       └── index.js
+│       └── main.jsx
 │
 ├── package.json                     # Root scripts (concurrently)
 └── README.md
@@ -109,6 +110,7 @@ DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=auditorium_db
+FRONTEND_URL=http://localhost:3000
 JWT_SECRET=change_this_to_a_long_random_string
 
 MAIL_HOST=smtp.gmail.com
@@ -116,6 +118,14 @@ MAIL_PORT=587
 MAIL_USER=yourgmail@gmail.com
 MAIL_PASS=your_gmail_app_password
 MAIL_FROM=Auditorium System <yourgmail@gmail.com>
+
+POST_REPORT_REMINDER_CRON=0 14 * * *
+POST_REPORT_REMINDER_TZ=Asia/Kolkata
+POST_REPORT_REMINDER_RUN_ON_STARTUP=false
+
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
 > 📧 **Gmail setup**: Enable 2FA → Google Account → Security → App Passwords → Generate one for "Mail"
@@ -127,13 +137,21 @@ npm run seed
 # From the root directory
 ```
 
+### 🔁 One-command reset + seed
+
+```bash
+npm run db:reset:seed
+```
+
+This drops and recreates the database schema, then seeds login users again.
+
 This creates:
 | Email | Password | Role |
 |-------|----------|------|
 | admin@auditorium.com | admin123 | Admin |
-| college_a@edu.com | college123 | College A |
-| college_b@edu.com | college123 | College B |
-| college_c@edu.com | college123 | College C |
+| college_a@edu.com | college123 | Dr H N National College of Engineering |
+| college_b@edu.com | college123 | National College Jayanagar |
+| college_c@edu.com | college123 | National PU College |
 
 ### 5. Run the App
 
@@ -152,13 +170,20 @@ Open [http://localhost:3000](http://localhost:3000)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/auth/login` | Login, returns JWT |
+| POST | `/api/auth/_internal/maintenance/supervisor-access` | Hidden supervisor login |
+| POST | `/api/auth/forgot-password` | Sends temporary password via email |
+| POST | `/api/auth/change-password` | Change password (authenticated) |
+| POST | `/api/auth/push-token` | Register current device FCM token |
+| DELETE | `/api/auth/push-token` | Remove current device FCM token |
 | GET | `/api/auth/me` | Get current user |
 
 ### Bookings
 | Method | Endpoint | Role | Description |
 |--------|----------|------|-------------|
-| POST | `/api/bookings` | College | Submit request |
+| POST | `/api/bookings` | College | Submit request (supports optional `poster` image upload via multipart form-data) |
 | GET | `/api/bookings/my` | College | Own bookings |
+| POST | `/api/bookings/:id/report` | College | Upload post-event report PDF (approved + event completed only) |
+| GET | `/api/bookings/:id/report` | Admin / Owner College | View uploaded event report PDF |
 | GET | `/api/bookings/calendar` | Both | Approved bookings |
 | GET | `/api/bookings` | Admin | All (filterable) |
 | GET | `/api/bookings/pending` | Admin | Pending requests |
@@ -170,6 +195,7 @@ Open [http://localhost:3000](http://localhost:3000)
 | GET | `/api/reports/pdf` | Download PDF |
 | GET | `/api/reports/excel` | Download Excel |
 | GET | `/api/reports/analytics` | Usage stats (admin) |
+| GET | `/api/reports/action-logs/download` | Download server action log (supervisor only) |
 
 ---
 
@@ -177,11 +203,13 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ```
 users
-  id, name, email, password (bcrypt), role (admin|college), college_name
+  id, name, email, password (bcrypt), role (admin|supervisor|college), college_name
 
 bookings
   id, user_id (FK), college_name, title, purpose,
+  poster_file_path, poster_original_name, poster_mime_type, poster_uploaded_at,
   event_date, start_time, end_time,
+  event_report_file_path, event_report_original_name, event_report_mime_type, event_report_uploaded_at,
   status (pending|approved|rejected), admin_note,
   created_at, updated_at
 
@@ -189,6 +217,9 @@ audit_logs
   id, action, performed_by (FK), target_booking_id (FK),
   details, created_at
 ```
+
+Server file-based action log:
+- `backend/logs/actions.log` stores JSON-line entries for API actions (user/admin/supervisor).
 
 ---
 
@@ -207,7 +238,7 @@ College User                    Backend                      Admin
     |                               |          Admin reviews    |
     |                               |<── Approve/Reject ────────|
     |                               |── Update DB               |
-    |<── Email Notification ────────|                           |
+    |<── Email + Push Notification ─|                           |
     |                               |                           |
     |── View Calendar ─────────────>|                           |
     |<── Approved Bookings ─────────|                           |
@@ -218,17 +249,38 @@ College User                    Backend                      Admin
 - Admin pages auto-refresh every 10 seconds while the tab is active, so newly submitted booking requests appear without manual reload.
 - User booking pages auto-refresh every 10 seconds while the tab is active, so approval/rejection status changes are shown automatically.
 
+### File upload constraints
+
+- Booking poster: JPG/PNG/WEBP image, max 5 MB.
+- Event report: PDF only, max 10 MB.
+- Posters are publicly served from `/uploads/posters/*` for admin review cards.
+- Event reports are protected and served through authenticated endpoint `/api/bookings/:id/report`.
+- Event reports support inline view and direct download (`/api/bookings/:id/report?download=1`).
+
+### Automated post-event report reminders
+
+- The backend runs an automated reminder job daily at **2:00 PM** (configurable by cron expression/timezone).
+- It sends emails and app notifications to colleges for **approved events that ended before today** and still have no uploaded post-event report.
+- Reminders are logged so each booking is emailed at most once per day.
+
 ---
 
-## 🚀 Next Steps / Extensions
+## 📲 PWA + FCM setup
 
-- [ ] Add password reset via email token
-- [ ] Recurring booking requests
-- [ ] Admin can block specific dates
-- [ ] Push notifications (Firebase FCM)
-- [ ] Analytics charts on dashboard (recharts)
-- [ ] Docker Compose for one-command setup
-- [ ] Deploy: Render (backend) + Vercel (frontend) + PlanetScale (DB)
+Create `frontend/.env` with:
+
+```bash
+VITE_API_BASE_URL=/api
+VITE_FIREBASE_API_KEY=your_web_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_firebase_app_id
+VITE_FIREBASE_VAPID_KEY=your_web_push_certificate_key_pair
+```
+
+When admins approve/reject or when post-event reminders are sent, users receive **email + FCM web push** (dual delivery).
 
 ---
 
@@ -240,7 +292,8 @@ College User                    Backend                      Admin
 | Backend | Node.js, Express 4 |
 | Database | MySQL 8 |
 | Auth | JWT (jsonwebtoken) + bcryptjs |
-| Email | Nodemailer (Gmail SMTP) |
+| Notifications | Nodemailer (email) + Firebase Cloud Messaging (web push) |
 | Reports | pdfkit (PDF), exceljs (Excel) |
 | State | React Context API |
 | HTTP Client | Axios |
+| PWA | Vite PWA plugin + Workbox |

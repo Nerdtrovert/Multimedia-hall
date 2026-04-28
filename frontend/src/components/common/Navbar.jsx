@@ -11,7 +11,7 @@ const Navbar = () => {
     navigate('/login');
   };
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = ['admin', 'supervisor'].includes(user?.role);
   const base = isAdmin ? '/admin' : '/user';
 
   return (
@@ -21,40 +21,50 @@ const Navbar = () => {
         <span className="navbar-title">B V Jagadish Multimedia Hall</span>
       </div>
       <div className="navbar-links">
-        <NavLink to={`${base}/dashboard`} className={({ isActive }) => isActive ? "active" : ""}>
-          Dashboard
+      <NavLink to={`${base}/dashboard`} className={({ isActive }) => isActive ? "active" : ""}>
+        Dashboard
+      </NavLink>
+
+      <NavLink to={`${base}/calendar`} className={({ isActive }) => isActive ? "active" : ""}>
+        Calendar
+      </NavLink>
+
+      {!isAdmin && (
+        <NavLink to="/user/new-booking" className={({ isActive }) => isActive ? "active" : ""}>
+          New Booking
         </NavLink>
-        <NavLink to={`${base}/calendar`} className={({ isActive }) => isActive ? "active" : ""}>
-          Calendar
+      )}
+
+      {!isAdmin && (
+        <NavLink to="/user/my-bookings" className={({ isActive }) => isActive ? "active" : ""}>
+          My Bookings
         </NavLink>
-        {!isAdmin && (
-          <NavLink to="/user/new-booking" className={({ isActive }) => isActive ? "active" : ""}>
-            New Booking
-          </NavLink>
-        )}
-        {!isAdmin && (
-          <NavLink to="/user/my-bookings" className={({ isActive }) => isActive ? "active" : ""}>
-            My Bookings
-          </NavLink>
-        )}
-        {isAdmin && (
-          <NavLink to="/admin/requests" className={({ isActive }) => isActive ? "active" : ""}>
-            Requests
-          </NavLink>
-        )}
-        {isAdmin && (
-          <NavLink to="/admin/all-bookings" className={({ isActive }) => isActive ? "active" : ""}>
-            All Bookings
-          </NavLink>
-        )}
-        <NavLink to={`${base}/reports`} className={({ isActive }) => isActive ? "active" : ""}>
-          Reports
+      )}
+
+      {isAdmin && (
+        <NavLink to="/admin/requests" className={({ isActive }) => isActive ? "active" : ""}>
+          Requests
         </NavLink>
+      )}
+
+      {isAdmin && (
+        <NavLink to="/admin/all-bookings" className={({ isActive }) => isActive ? "active" : ""}>
+          All Bookings
+        </NavLink>
+      )}
+
+      <NavLink to={`${base}/reports`} className={({ isActive }) => isActive ? "active" : ""}>
+        Reports
+      </NavLink>
+
+      <NavLink to={`${base}/change-password`} className={({ isActive }) => isActive ? "active" : ""}>
+        Change Password
+      </NavLink>
       </div>
       <div className="navbar-user">
         <span className="user-info">
           <span className={`role-badge ${isAdmin ? 'admin' : 'college'}`}>
-            {isAdmin ? 'Admin' : user?.college_name}
+            {isAdmin ? (user?.role === 'supervisor' ? 'Supervisor' : 'Admin') : user?.college_name}
           </span>
           {user?.name}
         </span>

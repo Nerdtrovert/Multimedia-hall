@@ -243,6 +243,28 @@
   color: white;
 }
 
+.forgot-password-link {
+  margin-top: 6px;
+  text-align: right;
+  color: #1e3a5f;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.forgot-password-link:hover {
+  color: #2d6a9f;
+  text-decoration: underline;
+}
+
+.login-hints {
+  margin-top: 24px;
+  padding: 16px;
+  background: #f0f4f8;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

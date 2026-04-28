@@ -1,12 +1,22 @@
 const db = require("../config/db");
 const PDFDocument = require("pdfkit");
 const ExcelJS = require("exceljs");
+const { logAudit, actionLogPath, ensureActionLogFile } = require("../utils/audit");
 
 // ─── Helper: fetch bookings for report ───────────────────────────────────────
 async function fetchBookingsForReport(filters, userId = null) {
+  const fromDate = String(filters.from || "").split("T")[0];
+  const toDate = String(filters.to || "").split("T")[0];
+
   let query = `
-    SELECT b.id, b.college_name, b.title, b.purpose, b.event_date,
-           b.start_time, b.end_time, b.status, b.admin_note, b.created_at
+    SELECT b.id, b.college_name, b.title, b.purpose,
+           DATE_FORMAT(b.event_date, '%Y-%m-%d') AS event_date,
+           b.start_time, b.end_time, b.status, b.admin_note, b.created_at,
+           b.poster_file_path, b.event_report_file_path,
+           CASE
+             WHEN b.event_report_data IS NOT NULL OR b.event_report_file_path IS NOT NULL THEN 1
+             ELSE 0
+           END AS has_event_report
     FROM bookings b
     WHERE 1=1
   `;
@@ -24,13 +34,13 @@ async function fetchBookingsForReport(filters, userId = null) {
     query += " AND b.status = ?";
     params.push(filters.status);
   }
-  if (filters.from) {
+  if (fromDate) {
     query += " AND b.event_date >= ?";
-    params.push(filters.from);
+    params.push(fromDate);
   }
-  if (filters.to) {
+  if (toDate) {
     query += " AND b.event_date <= ?";
-    params.push(filters.to);
+    params.push(toDate);
   }
 
   query += " ORDER BY b.event_date DESC";
@@ -40,12 +50,13 @@ async function fetchBookingsForReport(filters, userId = null) {
 
 // ─── Generate PDF report ──────────────────────────────────────────────────────
 const generatePDF = async (req, res) => {
-  const isAdmin = req.user.role === "admin";
+  const isAdmin = ["admin", "supervisor"].includes(req.user.role);
   const filters = req.query;
   const userId = isAdmin ? null : req.user.id;
 
   try {
     const bookings = await fetchBookingsForReport(filters, userId);
+    const apiBaseUrl = `${req.protocol}://${req.get("host")}`;
 
     const doc = new PDFDocument({ margin: 50 });
     res.setHeader("Content-Type", "application/pdf");
@@ -67,8 +78,8 @@ const generatePDF = async (req, res) => {
     doc.moveDown(2);
 
     // ── Table setup ──────────────────────────────────────────────────────────
-    const headers = ["#", "College", "Title", "Date", "Time", "Status"];
-    const colWidths = [30, 100, 130, 80, 100, 70];
+    const headers = ["#", "College", "Title", "Description", "Date", "Time", "Status"];
+    const colWidths = [30, 85, 90, 110, 60, 80, 55];
     const ROW_HEIGHT = 20;
     const TABLE_LEFT = 50;
     const TABLE_RIGHT = TABLE_LEFT + colWidths.reduce((a, b) => a + b, 0); // 560
@@ -78,6 +89,7 @@ const generatePDF = async (req, res) => {
       let x = TABLE_LEFT;
       doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(bold ? 10 : 9);
       cols.forEach((col, i) => {
+        doc.fillColor(bold ? "white" : "#111827");
         doc.text(
           String(col ?? "—"),
           x + 4, // 4px inner padding
@@ -116,9 +128,7 @@ const generatePDF = async (req, res) => {
     // ── Draw header row ───────────────────────────────────────────────────────
     let currentY = doc.y;
     drawRowBg(currentY, true);
-    doc.fillColor("white");
     drawRow(headers, currentY, true);
-    doc.fillColor("black"); // reset fill color for data rows
     currentY += ROW_HEIGHT;
 
     // ── Draw data rows ────────────────────────────────────────────────────────
@@ -129,9 +139,7 @@ const generatePDF = async (req, res) => {
         currentY = 50;
         // Redraw header on new page
         drawRowBg(currentY, true);
-        doc.fillColor("white");
         drawRow(headers, currentY, true);
-        doc.fillColor("black");
         currentY += ROW_HEIGHT;
       }
 
@@ -142,7 +150,8 @@ const generatePDF = async (req, res) => {
         idx + 1,
         b.college_name,
         b.title,
-        new Date(b.event_date).toLocaleDateString(),
+        b.purpose || "—",
+        b.event_date,
         `${b.start_time} - ${b.end_time}`,
         b.status.toUpperCase(),
       ];
@@ -155,6 +164,73 @@ const generatePDF = async (req, res) => {
     doc.moveDown();
     doc.text("", TABLE_LEFT, currentY);
 
+    const bookingsWithFiles = bookings.filter(
+      (b) => b.poster_file_path || Number(b.has_event_report || 0) > 0,
+    );
+
+    if (bookingsWithFiles.length > 0) {
+      if (currentY > 660) {
+        doc.addPage();
+        currentY = 50;
+      } else {
+        currentY += 20;
+      }
+
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(12)
+        .fillColor("#111827")
+        .text("Attachment links", TABLE_LEFT, currentY);
+      currentY += 18;
+
+      bookingsWithFiles.forEach((b, index) => {
+        if (currentY > 760) {
+          doc.addPage();
+          currentY = 50;
+        }
+
+        const posterUrl = b.poster_file_path
+          ? `${apiBaseUrl}/uploads/${b.poster_file_path.replace(/\\/g, "/")}`
+          : null;
+        const reportUrl = Number(b.has_event_report || 0) > 0
+          ? `${apiBaseUrl}/api/bookings/${b.id}/report`
+          : null;
+
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(10)
+          .fillColor("#111827")
+          .text(`${index + 1}. ${b.title} (${b.event_date})`, TABLE_LEFT, currentY);
+        currentY += 14;
+
+        if (posterUrl) {
+          doc
+            .font("Helvetica")
+            .fontSize(9)
+            .fillColor("#1d4ed8")
+            .text(`Poster: ${posterUrl}`, TABLE_LEFT + 10, currentY, {
+              link: posterUrl,
+              underline: true,
+            });
+          currentY += 14;
+        }
+
+        if (reportUrl) {
+          doc
+            .font("Helvetica")
+            .fontSize(9)
+            .fillColor("#1d4ed8")
+            .text(`Post-event report: ${reportUrl}`, TABLE_LEFT + 10, currentY, {
+              link: reportUrl,
+              underline: true,
+            });
+          currentY += 14;
+        }
+
+        currentY += 6;
+      });
+    }
+
     doc.end();
   } catch (err) {
     console.error("PDF generation error:", err);
@@ -164,12 +240,13 @@ const generatePDF = async (req, res) => {
 
 // ─── Generate CSV/Excel report ────────────────────────────────────────────────
 const generateExcel = async (req, res) => {
-  const isAdmin = req.user.role === "admin";
+  const isAdmin = ["admin", "supervisor"].includes(req.user.role);
   const filters = req.query;
   const userId = isAdmin ? null : req.user.id;
 
   try {
     const bookings = await fetchBookingsForReport(filters, userId);
+    const apiBaseUrl = `${req.protocol}://${req.get('host')}`;
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Bookings");
@@ -184,6 +261,8 @@ const generateExcel = async (req, res) => {
       { header: "End Time", key: "end_time", width: 12 },
       { header: "Status", key: "status", width: 12 },
       { header: "Admin Note", key: "admin_note", width: 30 },
+      { header: "Poster Link", key: "poster_url", width: 50 },
+      { header: "Post-Event Report Link", key: "event_report_url", width: 50 },
       { header: "Submitted At", key: "created_at", width: 20 },
     ];
 
@@ -196,7 +275,27 @@ const generateExcel = async (req, res) => {
     };
     sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
 
-    bookings.forEach((b) => sheet.addRow(b));
+    bookings.forEach((b) => {
+      const row = sheet.addRow({
+        ...b,
+        poster_url: b.poster_file_path ? `${apiBaseUrl}/uploads/${b.poster_file_path.replace(/\\/g, '/')}` : '',
+        event_report_url: Number(b.has_event_report || 0) > 0 ? `${apiBaseUrl}/api/bookings/${b.id}/report` : '',
+      });
+
+      if (b.poster_file_path) {
+        row.getCell('poster_url').value = {
+          text: 'View poster',
+          hyperlink: `${apiBaseUrl}/uploads/${b.poster_file_path.replace(/\\/g, '/')}`,
+        };
+      }
+
+      if (Number(b.has_event_report || 0) > 0) {
+        row.getCell('event_report_url').value = {
+          text: 'View report',
+          hyperlink: `${apiBaseUrl}/api/bookings/${b.id}/report`,
+        };
+      }
+    });
 
     res.setHeader(
       "Content-Type",
@@ -237,4 +336,25 @@ const getAnalytics = async (req, res) => {
   }
 };
 
-module.exports = { generatePDF, generateExcel, getAnalytics };
+const downloadActionLogs = async (req, res) => {
+  try {
+    ensureActionLogFile();
+
+    await logAudit(
+      "ACTION_LOG_DOWNLOADED",
+      req.user.id,
+      null,
+      `Action log downloaded by ${req.user.email}`
+    );
+
+    const filename = `actions-${new Date().toISOString().slice(0, 10)}.log`;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.sendFile(actionLogPath);
+  } catch (err) {
+    console.error("Action log download error:", err);
+    return res.status(500).json({ message: "Failed to download action logs." });
+  }
+};
+
+module.exports = { generatePDF, generateExcel, getAnalytics, downloadActionLogs };

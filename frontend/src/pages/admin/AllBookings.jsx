@@ -1,22 +1,46 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getAllBookings } from '../../utils/api';
+import {
+  updateBookingStatus,
+  getAllBookings,
+  toApiFileUrl,
+} from '../../utils/api';
+import { openReport, downloadReport } from '../../utils/fileHelpers';
+import { toast } from 'react-toastify';
 import Navbar from '../../components/common/Navbar';
 import PageBackButton from '../../components/common/PageBackButton';
 import StatusBadge from '../../components/common/StatusBadge';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
+import { COLLEGE_NAMES } from '../../constants/colleges';
 import '../Dashboard.css';
 
 const AllBookings = () => {
   const [bookings, setBookings] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({ college: '', status: '', from: '', to: '' });
-  const [appliedFilters, setAppliedFilters] = useState({ college: '', status: '', from: '', to: '' });
+  const [cancellingId, setCancellingId] = useState(null);
+
+  const [filters, setFilters] = useState({
+    college: '',
+    status: '',
+    from: '',
+    to: '',
+    page: 1,
+  });
+
+  const [appliedFilters, setAppliedFilters] = useState({
+    college: '',
+    status: '',
+    from: '',
+    to: '',
+    page: 1,
+  });
 
   const fetchBookings = useCallback(async (f, showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
       const res = await getAllBookings(f);
-      setBookings(res.data);
+      setBookings(res.data.data);
+      setMeta(res.data.meta);
     } finally {
       if (showLoader) setLoading(false);
     }
@@ -37,9 +61,32 @@ const AllBookings = () => {
   };
 
   const handleReset = () => {
-    const cleared = { college: '', status: '', from: '', to: '' };
+    const cleared = { college: '', status: '', from: '', to: '', page: 1 };
     setFilters(cleared);
     setAppliedFilters(cleared);
+  };
+
+  const handleAdminCancel = async (booking) => {
+    const note = window.prompt(
+      `Cancel approved booking "${booking.title}"?\nOptional note (shown to user):`,
+      'Approved booking cancelled by admin.'
+    );
+
+    if (note === null) return;
+
+    setCancellingId(booking.id);
+    try {
+      await updateBookingStatus(booking.id, 'rejected', note);
+      toast.success('Approved booking cancelled.');
+      await fetchBookings(appliedFilters, false);
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          'Failed to cancel approved booking.'
+      );
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   return (
@@ -64,9 +111,9 @@ const AllBookings = () => {
               onChange={handleChange}
             >
               <option value="">All Colleges</option>
-              <option>College A</option>
-              <option>College B</option>
-              <option>College C</option>
+              {COLLEGE_NAMES.map((collegeName) => (
+                <option key={collegeName}>{collegeName}</option>
+              ))}
             </select>
 
             <select
@@ -115,9 +162,9 @@ const AllBookings = () => {
         {loading ? (
           <p>Loading...</p>
         ) : (
-          <div className="card">
+          <div className="table-card">
             <p className="result-count">
-              {bookings.length} record(s) found
+              {meta ? meta.total : bookings.length} record(s) found
             </p>
 
             <table className="bookings-table">
@@ -128,41 +175,170 @@ const AllBookings = () => {
                   <th>Date</th>
                   <th>Time</th>
                   <th>Status</th>
+                  <th>Poster</th>
+                  <th>Event Report</th>
                   <th>Note</th>
                   <th>Submitted By</th>
+                  <th>Action</th>
                 </tr>
               </thead>
 
               <tbody>
                 {bookings.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="empty-msg">
+                    <td
+                      colSpan="10"
+                      style={{ textAlign: 'center', color: '#9ca3af' }}
+                    >
                       No records found.
                     </td>
                   </tr>
                 ) : (
                   bookings.map((b) => (
                     <tr key={b.id}>
-                      <td><strong>{b.college_name}</strong></td>
+                      <td>
+                        <strong>{b.college_name}</strong>
+                      </td>
                       <td>{b.title}</td>
-                      <td>{new Date(b.event_date).toLocaleDateString()}</td>
-                      <td>{b.start_time} – {b.end_time}</td>
+                      <td>
+                        {new Date(b.event_date).toLocaleDateString()}
+                      </td>
+                      <td>
+                        {b.start_time} – {b.end_time}
+                      </td>
                       <td>
                         <StatusBadge status={b.status} />
                       </td>
+
                       <td>
-                        {b.admin_note || (
-                          <span className="empty-msg">—</span>
+                        {b.poster_url ? (
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            <a
+                              href={toApiFileUrl(b.poster_url)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <img
+                                src={toApiFileUrl(b.poster_url)}
+                                alt={`${b.title} poster`}
+                                className="table-poster-thumb"
+                              />
+                            </a>
+                            <a
+                              className="link-btn"
+                              href={toApiFileUrl(b.poster_url)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              View poster
+                            </a>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#9ca3af' }}>—</span>
                         )}
                       </td>
-                      <td className="muted-text">
+
+                      <td>
+                        {b.event_report_url ? (
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            <button
+                              type="button"
+                              className="link-btn"
+                              onClick={() => openReport(b)}
+                            >
+                              View report
+                            </button>
+                            <button
+                              type="button"
+                              className="link-btn"
+                              onClick={() => downloadReport(b)}
+                            >
+                              Download report
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#9ca3af' }}>—</span>
+                        )}
+                      </td>
+
+                      <td>
+                        {b.admin_note || (
+                          <span style={{ color: '#9ca3af' }}>—</span>
+                        )}
+                      </td>
+
+                      <td
+                        style={{
+                          fontSize: '12px',
+                          color: '#6b7280',
+                        }}
+                      >
                         {b.user_email}
+                      </td>
+
+                      <td>
+                        {b.status === 'approved' ? (
+                          <button
+                            className="btn-secondary"
+                            onClick={() => handleAdminCancel(b)}
+                            disabled={cancellingId === b.id}
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                          >
+                            {cancellingId === b.id
+                              ? 'Cancelling...'
+                              : 'Cancel booking'}
+                          </button>
+                        ) : (
+                          <span style={{ color: '#9ca3af' }}>—</span>
+                        )}
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+
+            {meta && meta.totalPages > 1 && (
+              <div
+                className="pagination"
+                style={{
+                  display: 'flex',
+                  gap: '10px',
+                  justifyContent: 'center',
+                  marginTop: '1rem',
+                }}
+              >
+                <button
+                  className="btn-secondary"
+                  disabled={meta.page <= 1}
+                  onClick={() =>
+                    setAppliedFilters({
+                      ...appliedFilters,
+                      page: meta.page - 1,
+                    })
+                  }
+                >
+                  Previous
+                </button>
+
+                <span style={{ alignSelf: 'center' }}>
+                  Page {meta.page} of {meta.totalPages}
+                </span>
+
+                <button
+                  className="btn-secondary"
+                  disabled={meta.page >= meta.totalPages}
+                  onClick={() =>
+                    setAppliedFilters({
+                      ...appliedFilters,
+                      page: meta.page + 1,
+                    })
+                  }
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

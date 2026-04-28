@@ -4,39 +4,59 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useNavigate } from 'react-router-dom';
-import { getCalendarBookings } from '../utils/api';
+import { getCalendarBookings, openProtectedFileInNewTab, toApiFileUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/common/Navbar';
 import PageBackButton from '../components/common/PageBackButton';
+import { toast } from 'react-toastify';
 import './Calendar.css';
 
 /* ===============================
-   COLLEGE COLORS ONLY (UPDATED)
+   COLLEGE COLORS
 ================================ */
 const COLLEGE_COLORS = {
-  'College A': '#2563eb', // Blue
-  'College B': '#f97316', // Orange
-  'College C': '#22c55e', // Green
+  'College A': '#2563eb',
+  'College B': '#f97316',
+  'College C': '#22c55e',
 };
 
 const DEFAULT_COLOR = '#6366f1';
+
+/* ===============================
+   HELPERS
+================================ */
+const formatDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const toLocalDateTime = (dateStr, timeStr) => {
   return `${dateStr}T${timeStr}`;
 };
 
+const toDateParam = (value) => {
+  if (!value) return '';
+  if (value instanceof Date) return formatDateKey(value);
+  return String(value).split('T')[0];
+};
+
 const CalendarView = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
+
+  const todayDate = formatDateKey(new Date());
 
   useEffect(() => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    fetchBookings(start.toISOString(), end.toISOString());
+    fetchBookings(toDateParam(start), toDateParam(end));
   }, []);
 
   const fetchBookings = async (startDate, endDate) => {
@@ -44,7 +64,7 @@ const CalendarView = () => {
       const res = await getCalendarBookings(startDate, endDate);
 
       const mapped = res.data.map((booking) => {
-        const collegeColor =
+        const color =
           COLLEGE_COLORS[booking.college_name] || DEFAULT_COLOR;
 
         return {
@@ -58,14 +78,10 @@ const CalendarView = () => {
             booking.event_date.split('T')[0],
             booking.end_time
           ),
-
-          /* ONLY COLLEGE COLOR USED */
-          backgroundColor: collegeColor,
-          borderColor: collegeColor,
-
+          backgroundColor: color,
+          borderColor: color,
           extendedProps: {
             ...booking,
-            collegeColor,
           },
         };
       });
@@ -85,9 +101,23 @@ const CalendarView = () => {
 
     const selectedDate = info.dateStr.split('T')[0];
 
+    if (selectedDate < todayDate) {
+      toast.error('Past dates are disabled');
+      return;
+    }
+
     navigate(`/user/new-booking?date=${selectedDate}`, {
       state: { selectedDate },
     });
+  };
+
+  const openEventReport = async (url) => {
+    if (!url) return;
+    try {
+      await openProtectedFileInNewTab(url);
+    } catch {
+      toast.error('Failed to open report');
+    }
   };
 
   return (
@@ -97,7 +127,7 @@ const CalendarView = () => {
       <div className="calendar-page">
         <PageBackButton
           fallback={
-            user?.role === 'admin'
+            ['admin', 'supervisor'].includes(user?.role)
               ? '/admin/dashboard'
               : '/user/dashboard'
           }
@@ -113,7 +143,7 @@ const CalendarView = () => {
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             datesSet={(arg) => {
-              fetchBookings(arg.startStr, arg.endStr);
+              fetchBookings(toDateParam(arg.start), toDateParam(arg.end));
             }}
             headerToolbar={{
               left: 'prev,next today',
@@ -123,10 +153,8 @@ const CalendarView = () => {
             events={events}
             eventClick={handleEventClick}
             dateClick={handleDateClick}
+            validRange={user?.role === 'college' ? { start: todayDate } : undefined}
 
-            /* ===============================
-               CLEAN EVENT RENDERING
-            ================================= */
             eventContent={(eventInfo) => {
               const { title, start, end } = eventInfo.event;
 
@@ -140,49 +168,27 @@ const CalendarView = () => {
                 minute: '2-digit',
               });
 
-              const color =
-                eventInfo.event.backgroundColor || DEFAULT_COLOR;
-
               return (
                 <div
                   style={{
-                    backgroundColor: color,
+                    backgroundColor: eventInfo.event.backgroundColor,
                     color: '#fff',
                     borderRadius: '6px',
                     padding: '6px 8px',
                     fontSize: '11px',
-                    lineHeight: '1.3',
-                    fontWeight: 500,
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
                   }}
                 >
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {title}
-                  </div>
-
-                  <div style={{ opacity: 0.9, fontSize: '10px' }}>
+                  <div>{title}</div>
+                  <div style={{ fontSize: '10px' }}>
                     {startTime} – {endTime}
                   </div>
                 </div>
               );
             }}
-
-            height="auto"
           />
         </div>
 
-        {/* ===============================
-            MODAL
-        ================================= */}
+        {/* MODAL */}
         {selectedEvent && (
           <div
             className="event-modal-overlay"
@@ -202,20 +208,40 @@ const CalendarView = () => {
               <h3>{selectedEvent.title}</h3>
 
               <div className="event-details">
-                <p>
-                  <strong>College:</strong>{' '}
-                  {selectedEvent.college_name}
-                </p>
+                <p><strong>College:</strong> {selectedEvent.college_name}</p>
+                <p><strong>Date:</strong> {toDateParam(selectedEvent.event_date)}</p>
+                <p><strong>Time:</strong> {selectedEvent.start_time} - {selectedEvent.end_time}</p>
 
-                <p>
-                  <strong>Date:</strong>{' '}
-                  {new Date(selectedEvent.event_date).toDateString()}
-                </p>
+                {selectedEvent.purpose && (
+                  <p><strong>Purpose:</strong> {selectedEvent.purpose}</p>
+                )}
 
-                <p>
-                  <strong>Time:</strong>{' '}
-                  {selectedEvent.start_time} - {selectedEvent.end_time}
-                </p>
+                {selectedEvent.poster_url && (
+                  <p>
+                    <strong>Poster:</strong>{' '}
+                    <a
+                      href={toApiFileUrl(selectedEvent.poster_url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View poster
+                    </a>
+                  </p>
+                )}
+
+                {selectedEvent.event_report_url && (
+                  <p>
+                    <strong>Event report:</strong>{' '}
+                    <button
+                      className="link-btn"
+                      onClick={() =>
+                        openEventReport(selectedEvent.event_report_url)
+                      }
+                    >
+                      View report
+                    </button>
+                  </p>
+                )}
               </div>
             </div>
           </div>

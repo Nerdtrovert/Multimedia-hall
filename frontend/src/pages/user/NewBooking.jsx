@@ -34,6 +34,14 @@ const hasOverlap = (startMinutes, endMinutes, ranges) =>
 
 const normalizeDate = (value) => (value ? value.split('T')[0] : '');
 
+const getTodayKey = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, '0');
+  const day = `${now.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const NewBooking = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -45,14 +53,18 @@ const NewBooking = () => {
     event_date: '',
     start_time: '',
     end_time: '',
+    poster: null,
   });
 
   const [submitting, setSubmitting] = useState(false);
   const [bookingsByDate, setBookingsByDate] = useState({});
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayKey();
   const timeSlots = useMemo(buildTimeSlots, []);
 
+  /* ===============================
+     PRESET DATE FROM CALENDAR
+  ============================== */
   useEffect(() => {
     const presetDate = normalizeDate(
       searchParams.get('date') || location.state?.selectedDate || ''
@@ -68,10 +80,20 @@ const NewBooking = () => {
     }
   }, [searchParams, location.state]);
 
+  /* ===============================
+     LOAD BOOKINGS (NEXT 3 MONTHS)
+  ============================== */
   useEffect(() => {
     const loadBookings = async () => {
       try {
-        const res = await getCalendarBookings();
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 3);
+
+        const res = await getCalendarBookings(
+          normalizeDate(startDate.toISOString()),
+          normalizeDate(endDate.toISOString())
+        );
 
         const grouped = res.data.reduce((acc, booking) => {
           const dateKey = booking.event_date.split('T')[0];
@@ -129,7 +151,12 @@ const NewBooking = () => {
   });
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, files } = e.target;
+
+    if (name === 'poster') {
+      setForm((current) => ({ ...current, poster: files?.[0] || null }));
+      return;
+    }
 
     if (name === 'event_date') {
       setForm((current) => ({
@@ -153,11 +180,19 @@ const NewBooking = () => {
     setForm((current) => ({ ...current, [name]: value }));
   };
 
+  /* ===============================
+     SUBMIT
+  ============================== */
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (form.start_time >= form.end_time) {
       toast.error('End time must be after start time.');
+      return;
+    }
+
+    if (form.event_date < today) {
+      toast.error('Bookings cannot be created for past dates.');
       return;
     }
 
@@ -168,14 +203,23 @@ const NewBooking = () => {
         bookedRanges
       )
     ) {
-      toast.error('That time overlaps with an existing approved booking.');
+      toast.error('That time overlaps with an existing booking.');
       return;
     }
 
     setSubmitting(true);
 
     try {
-      await submitBooking(form);
+      const payload = new FormData();
+      payload.append('title', form.title);
+      payload.append('purpose', form.purpose);
+      payload.append('event_date', form.event_date);
+      payload.append('start_time', form.start_time);
+      payload.append('end_time', form.end_time);
+      if (form.poster) payload.append('poster', form.poster);
+
+      await submitBooking(payload);
+
       toast.success('Booking request submitted!');
       navigate('/user/my-bookings');
     } catch (err) {
@@ -192,7 +236,6 @@ const NewBooking = () => {
       <div className="form-page">
         <PageBackButton fallback="/user/dashboard" />
 
-        {/* ✅ use system card */}
         <div className="form-card card">
           <div className="form-title">
             <h2>B V Jagadish Multimedia Hall Booking</h2>
@@ -201,7 +244,6 @@ const NewBooking = () => {
 
           <form onSubmit={handleSubmit} className="booking-form">
 
-            {/* TITLE */}
             <div className="form-group">
               <label>Event Title *</label>
               <input
@@ -209,25 +251,34 @@ const NewBooking = () => {
                 name="title"
                 value={form.title}
                 onChange={handleChange}
-                placeholder="e.g. Annual Cultural Fest"
                 required
               />
             </div>
 
-            {/* PURPOSE */}
             <div className="form-group">
-              <label>Purpose / Description</label>
+              <label>Purpose</label>
               <textarea
                 className="input"
                 name="purpose"
                 value={form.purpose}
                 onChange={handleChange}
                 rows={3}
-                placeholder="Briefly describe the event..."
               />
             </div>
 
-            {/* DATE */}
+            <div className="form-group">
+              <label>Event Poster</label>
+              <input
+                type="file"
+                name="poster"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleChange}
+              />
+              <small className="form-help">
+                Optional (JPG, PNG, WEBP)
+              </small>
+            </div>
+
             <div className="form-group">
               <label>Event Date *</label>
               <input
@@ -241,92 +292,54 @@ const NewBooking = () => {
               />
             </div>
 
-            {/* AVAILABILITY */}
             {form.event_date && (
               <div className="booking-availability">
-                <div className="availability-title">
-                  Booked slots
-                </div>
-
                 {bookedRanges.length === 0 ? (
-                  <p className="availability-empty">
-                    All slots available
-                  </p>
+                  <p>All slots available</p>
                 ) : (
-                  <div className="availability-chips">
-                    {bookedRanges.map((range) => (
-                      <span key={range.label} className="availability-chip">
-                        {range.label}
-                      </span>
-                    ))}
-                  </div>
+                  bookedRanges.map((r) => (
+                    <span key={r.label}>{r.label}</span>
+                  ))
                 )}
               </div>
             )}
 
-            {/* TIME */}
             <div className="form-row">
+              <select
+                className="input"
+                name="start_time"
+                value={form.start_time}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Start</option>
+                {startOptions.map((o) => (
+                  <option key={o.value} value={o.value} disabled={o.disabled}>
+                    {o.value}
+                  </option>
+                ))}
+              </select>
 
-              <div className="form-group">
-                <label>Start Time *</label>
-                <select
-                  className="input"
-                  name="start_time"
-                  value={form.start_time}
-                  onChange={handleChange}
-                  required
-                  disabled={!form.event_date}
-                >
-                  <option value="">Select start</option>
-                  {startOptions.map((option) => (
-                    <option key={option.value} value={option.value} disabled={option.disabled}>
-                      {option.value}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>End Time *</label>
-                <select
-                  className="input"
-                  name="end_time"
-                  value={form.end_time}
-                  onChange={handleChange}
-                  required
-                  disabled={!form.start_time}
-                >
-                  <option value="">Select end</option>
-                  {endOptions.map((option) => (
-                    <option key={option.value} value={option.value} disabled={option.disabled}>
-                      {option.value}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
+              <select
+                className="input"
+                name="end_time"
+                value={form.end_time}
+                onChange={handleChange}
+                required
+              >
+                <option value="">End</option>
+                {endOptions.map((o) => (
+                  <option key={o.value} value={o.value} disabled={o.disabled}>
+                    {o.value}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* ACTIONS */}
-            <div className="form-actions">
+            <button className="btn btn-accent" disabled={submitting}>
+              {submitting ? 'Submitting...' : 'Submit'}
+            </button>
 
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => navigate('/user/dashboard')}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                className="btn btn-accent"
-                disabled={submitting}
-              >
-                {submitting ? 'Submitting...' : 'Submit Request'}
-              </button>
-
-            </div>
           </form>
         </div>
       </div>

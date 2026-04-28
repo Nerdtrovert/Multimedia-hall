@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import './Login.css';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -19,25 +18,26 @@ const Login = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    const userData = await login(form.email, form.password);
-    toast.success('Login successful!');
-    if (userData.role === 'admin') {
-      navigate('/admin/dashboard');
-    } else {
-      navigate('/user/dashboard');
+    try {
+      const userData = await login(form.email, form.password);
+
+      toast.success(`Welcome, ${userData.name}!`);
+
+      if (['admin', 'supervisor'].includes(userData.role)) {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/user/dashboard');
+      }
+
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Login failed.');
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    toast.error(
-      err.response?.data?.message || 'Invalid credentials'
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="login-wrapper">
@@ -60,7 +60,7 @@ const Login = () => {
         {/* Background */}
         <div
           className="bg-image"
-          style={{ backgroundImage: "url('/bg.jpg')" }}
+          style={{ backgroundImage: "url('/bg.jpeg')" }}
         />
 
         {/* Card */}
@@ -98,6 +98,12 @@ const Login = () => {
                   onChange={handleChange}
                   required
                 />
+              </div>
+
+              <div style={{ textAlign: 'right', marginTop: '6px' }}>
+                <a href="/forgot-password" className="forgot-password-link">
+                  Forgot password?
+                </a>
               </div>
 
               <button className="submit-btn" disabled={loading}>

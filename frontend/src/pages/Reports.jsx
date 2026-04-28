@@ -4,11 +4,14 @@ import { downloadPDF, downloadExcel } from '../utils/api';
 import { toast } from 'react-toastify';
 import Navbar from '../components/common/Navbar';
 import PageBackButton from '../components/common/PageBackButton';
+import { COLLEGE_NAMES } from '../constants/colleges';
 import './Reports.css';
 
 const Reports = () => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+
+  // support admin + supervisor
+  const isAdmin = ['admin', 'supervisor'].includes(user?.role);
 
   const [filters, setFilters] = useState({
     college: '',
@@ -21,7 +24,6 @@ const Reports = () => {
     pdf: false,
     excel: false,
   });
-
   const handleChange = (e) =>
     setFilters({ ...filters, [e.target.name]: e.target.value });
 
@@ -38,9 +40,13 @@ const Reports = () => {
     setLoading((prev) => ({ ...prev, [type]: true }));
 
     try {
-      const params = isAdmin
-        ? filters
-        : { from: filters.from, to: filters.to };
+      const rawParams = isAdmin
+  ? filters
+  : { from: filters.from, to: filters.to };
+
+const params = Object.fromEntries(
+  Object.entries(rawParams).filter(([, value]) => String(value || '').trim() !== '')
+);
 
       const res =
         type === 'pdf'
@@ -72,7 +78,7 @@ const Reports = () => {
 
         <div className="page-header">
           <h2>📊 Reports</h2>
-          <p>Export booking data as PDF or Excel.</p>
+          <p>Export booking data as PDF or Excel, including event description and poster/report links when available.</p>
         </div>
 
         <div className="reports-card">
@@ -91,9 +97,9 @@ const Reports = () => {
                       className="input"
                     >
                       <option value="">All Colleges</option>
-                      <option>College A</option>
-                      <option>College B</option>
-                      <option>College C</option>
+                      {COLLEGE_NAMES.map((collegeName) => (
+                        <option key={collegeName}>{collegeName}</option>
+                      ))}
                     </select>
                   </div>
 

@@ -18,8 +18,8 @@ const authenticate = (req, res, next) => {
 };
 
 const authorizeAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Admin access required.' });
+  if (!['admin', 'supervisor'].includes(req.user.role)) {
+    return res.status(403).json({ message: 'Admin or supervisor access required.' });
   }
   next();
 };
@@ -31,4 +31,11 @@ const authorizeCollege = (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, authorizeAdmin, authorizeCollege };
+const authorizeSupervisor = (req, res, next) => {
+  if (req.user.role !== 'supervisor') {
+    return res.status(403).json({ message: 'Supervisor access required.' });
+  }
+  next();
+};
+
+module.exports = { authenticate, authorizeAdmin, authorizeCollege, authorizeSupervisor };

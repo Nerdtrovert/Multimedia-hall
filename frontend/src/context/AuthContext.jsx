@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import api from '../utils/api';
+import {
+  disablePushNotifications,
+  enablePushNotifications,
+  isRunningInstalledApp,
+} from '../utils/pushNotifications';
 
 const AuthContext = createContext(null);
 const USER_STORAGE_KEY = 'user';
@@ -18,13 +23,14 @@ const storeUser = (user) => {
 };
 
 const preloadRoutes = (role) => {
-  if (role === 'admin') {
+  if (['admin', 'supervisor'].includes(role)) {
     Promise.allSettled([
       import('../pages/admin/AdminDashboard'),
       import('../pages/admin/AdminRequests'),
       import('../pages/admin/AllBookings'),
       import('../pages/CalendarView'),
       import('../pages/Reports'),
+      import('../pages/ChangePassword'),
     ]);
     return;
   }
@@ -35,13 +41,17 @@ const preloadRoutes = (role) => {
     import('../pages/user/MyBookings'),
     import('../pages/CalendarView'),
     import('../pages/Reports'),
+    import('../pages/ChangePassword'),
   ]);
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => readStoredUser());
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [loading, setLoading] = useState(() => !readStoredUser() && !!localStorage.getItem('token'));
+  const initialUser = readStoredUser();
+  const initialToken = localStorage.getItem('token');
+
+  const [user, setUser] = useState(() => initialUser);
+  const [token, setToken] = useState(initialToken);
+  const [loading, setLoading] = useState(() => !initialUser && !!initialToken);
 
   useEffect(() => {
     if (token) {
@@ -55,6 +65,46 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !user) return;
+
+    const setupPush = (requestPermission) => {
+      enablePushNotifications({ requestPermission }).catch((err) => {
+        console.error('Push notifications setup failed:', err);
+      });
+    };
+
+    setupPush(isRunningInstalledApp());
+
+    const onAppInstalled = () => {
+      setupPush(true);
+    };
+
+    window.addEventListener('appinstalled', onAppInstalled);
+
+    const media = window.matchMedia('(display-mode: standalone)');
+    const onStandaloneChange = (event) => {
+      if (event.matches) {
+        setupPush(true);
+      }
+    };
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onStandaloneChange);
+    } else if (typeof media.addListener === 'function') {
+      media.addListener(onStandaloneChange);
+    }
+
+    return () => {
+      window.removeEventListener('appinstalled', onAppInstalled);
+      if (typeof media.removeEventListener === 'function') {
+        media.removeEventListener('change', onStandaloneChange);
+      } else if (typeof media.removeListener === 'function') {
+        media.removeListener(onStandaloneChange);
+      }
+    };
+  }, [token, user]);
 
   const fetchMe = async (backgroundRefresh = false) => {
     try {
@@ -71,8 +121,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
-    const res = await api.post('/auth/login', { email, password });
+  const performLogin = async (email, password, endpoint = '/auth/login') => {
+    const res = await api.post(endpoint, { email, password });
     const { token: newToken, user: userData } = res.data;
     localStorage.setItem('token', newToken);
     storeUser(userData);
@@ -83,7 +133,14 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
+  const login = async (email, password) => performLogin(email, password, '/auth/login');
+  const loginSupervisor = async (email, password) =>
+    performLogin(email, password, '/auth/_internal/maintenance/supervisor-access');
+
   const logout = () => {
+    disablePushNotifications().catch((err) => {
+      console.error('Push notification cleanup failed:', err);
+    });
     localStorage.removeItem('token');
     localStorage.removeItem(USER_STORAGE_KEY);
     setToken(null);
@@ -92,7 +149,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, loginSupervisor, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
