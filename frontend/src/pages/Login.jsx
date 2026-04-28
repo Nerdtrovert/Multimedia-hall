@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import './Login.css';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ const Login = () => {
         {/* Background */}
         <div
           className="bg-image"
-          style={{ backgroundImage: "url('/bg.jpeg')" }}
+          style={{ backgroundImage: "url('/bg.jpg')" }}
         />
 
         {/* Card */}
@@ -101,9 +102,9 @@ const Login = () => {
               </div>
 
               <div style={{ textAlign: 'right', marginTop: '6px' }}>
-                <a href="/forgot-password" className="forgot-password-link">
+                <Link to="/forgot-password" className="forgot-password-link">
                   Forgot password?
-                </a>
+                </Link>
               </div>
 
               <button className="submit-btn" disabled={loading}>

@@ -1,1 +1,0 @@
-import{a as s,j as a}from"./index-D-nVHX0O.js";const c=({fallback:n})=>{const t=s(),e=()=>{if(window.history.length>1){t(-1);return}t(n)};return a.jsx("div",{className:"page-back-wrap",children:a.jsxs("button",{type:"button",className:"page-back-button",onClick:e,children:[a.jsx("span",{"aria-hidden":"true",children:"←"}),a.jsx("span",{children:"Back"})]})})};export{c as P};

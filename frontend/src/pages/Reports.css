@@ -2,6 +2,7 @@
   max-width: 900px;
   margin: 40px auto;
   padding: 0 20px;
+  width: 100%;
 }
 
 /* ─── Card ───────────────────────────── */
@@ -50,6 +51,7 @@
 .export-buttons {
   display: flex;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 /* ─── Responsive ─────────────────────── */
@@ -74,5 +76,16 @@
 
   .export-buttons .btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .reports-page {
+    margin: 16px auto;
+    padding: 0 10px;
+  }
+
+  .filters-section h3 {
+    margin-bottom: 12px;
   }
 }

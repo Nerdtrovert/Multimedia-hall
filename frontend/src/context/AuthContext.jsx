@@ -5,21 +5,37 @@ import {
   enablePushNotifications,
   isRunningInstalledApp,
 } from '../utils/pushNotifications';
+import { stripRepSuffix } from '../utils/displayName';
 
 const AuthContext = createContext(null);
 const USER_STORAGE_KEY = 'user';
 
+const normalizeUser = (user) => {
+  if (!user) return user;
+  return {
+    ...user,
+    name: stripRepSuffix(user.name),
+  };
+};
+
 const readStoredUser = () => {
   try {
     const rawUser = localStorage.getItem(USER_STORAGE_KEY);
-    return rawUser ? JSON.parse(rawUser) : null;
+    if (!rawUser) return null;
+    const parsedUser = JSON.parse(rawUser);
+    if (parsedUser?.role === 'supervisor') {
+      localStorage.removeItem('token');
+      localStorage.removeItem(USER_STORAGE_KEY);
+      return null;
+    }
+    return normalizeUser(parsedUser);
   } catch {
     return null;
   }
 };
 
 const storeUser = (user) => {
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(normalizeUser(user)));
 };
 
 const preloadRoutes = (role) => {
@@ -109,9 +125,10 @@ export const AuthProvider = ({ children }) => {
   const fetchMe = async (backgroundRefresh = false) => {
     try {
       const res = await api.get('/auth/me');
-      setUser(res.data);
-      storeUser(res.data);
-      preloadRoutes(res.data.role);
+      const normalizedUser = normalizeUser(res.data);
+      setUser(normalizedUser);
+      storeUser(normalizedUser);
+      preloadRoutes(normalizedUser.role);
     } catch {
       logout();
     } finally {
@@ -123,7 +140,8 @@ export const AuthProvider = ({ children }) => {
 
   const performLogin = async (email, password, endpoint = '/auth/login') => {
     const res = await api.post(endpoint, { email, password });
-    const { token: newToken, user: userData } = res.data;
+    const { token: newToken, user: rawUserData } = res.data;
+    const userData = normalizeUser(rawUserData);
     localStorage.setItem('token', newToken);
     storeUser(userData);
     setToken(newToken);

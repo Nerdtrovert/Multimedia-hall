@@ -80,9 +80,9 @@ INSERT IGNORE INTO users (name, email, password, role) VALUES
 
 -- Seed: College users (password: college123 for all)
 INSERT IGNORE INTO users (name, email, password, role, college_name) VALUES
-('Dr H N National College of Engineering Rep', 'college_a@edu.com', '$2a$10$YourHashedPasswordHere', 'college', 'Dr H N National College of Engineering'),
-('National College Jayanagar Rep', 'college_b@edu.com', '$2a$10$YourHashedPasswordHere', 'college', 'National College Jayanagar'),
-('National PU College Rep', 'college_c@edu.com', '$2a$10$YourHashedPasswordHere', 'college', 'National PU College');
+('Dr H N National College of Engineering', 'college_a@edu.com', '$2a$10$YourHashedPasswordHere', 'college', 'Dr H N National College of Engineering'),
+('National College Jayanagar', 'college_b@edu.com', '$2a$10$YourHashedPasswordHere', 'college', 'National College Jayanagar'),
+('National PU College', 'college_c@edu.com', '$2a$10$YourHashedPasswordHere', 'college', 'National PU College');
 
 -- Note: Run the seed script (npm run seed) to insert users with properly hashed passwords
 

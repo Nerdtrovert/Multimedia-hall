@@ -1,1 +1,0 @@
-import{r as t}from"./index-D-nVHX0O.js";const i=(e,r=1e4,u=!0)=>{const s=t.useRef(e);t.useEffect(()=>{s.current=e},[e]),t.useEffect(()=>{if(!u)return;const c=setInterval(()=>{document.visibilityState==="visible"&&s.current()},r);return()=>clearInterval(c)},[u,r])};export{i as u};

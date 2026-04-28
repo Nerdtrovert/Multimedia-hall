@@ -5,6 +5,7 @@
   max-width: 700px;
   margin: 40px auto;
   padding: 0 var(--space-md);
+  width: 100%;
 }
 
 /* ===============================
@@ -39,6 +40,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+}
+
+.booking-form .btn {
+  min-height: 42px;
 }
 
 .form-group {
@@ -162,5 +167,20 @@
 
   .form-actions .btn {
     width: 100%;
+  }
+
+  .booking-form {
+    gap: var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .form-page {
+    margin: 16px auto;
+    padding: 0 10px;
+  }
+
+  .form-title h2 {
+    font-size: 1.15rem;
   }
 }

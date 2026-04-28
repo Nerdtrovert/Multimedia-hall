@@ -38,13 +38,8 @@ const syncCollegeNames = async () => {
 
   await db.query(
     `UPDATE users
-     SET name = CASE email
-       WHEN 'college_a@edu.com' THEN 'Dr H N National College of Engineering Rep'
-       WHEN 'college_b@edu.com' THEN 'National College Jayanagar Rep'
-       WHEN 'college_c@edu.com' THEN 'National PU College Rep'
-       ELSE name
-     END
-     WHERE email IN ('college_a@edu.com', 'college_b@edu.com', 'college_c@edu.com')`
+     SET name = TRIM(TRAILING ' Rep' FROM name)
+     WHERE role = 'college' AND name LIKE '% Rep'`
   );
 };
 

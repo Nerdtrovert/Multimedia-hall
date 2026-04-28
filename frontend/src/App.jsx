@@ -9,6 +9,8 @@ import PublicRoute from './components/common/PublicRoute';
 
 import './App.css';
 
+const isAdminLikeRole = (role) => ['admin', 'supervisor'].includes(role);
+
 /* Lazy pages */
 const Login = lazy(() => import('./pages/Login'));
 const SupervisorLogin = lazy(() => import('./pages/SupervisorLogin'));
@@ -31,7 +33,7 @@ const HomeRedirect = () => {
 
   return (
     <Navigate
-      to={user.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'}
+      to={isAdminLikeRole(user.role) ? '/admin/dashboard' : '/user/dashboard'}
       replace
     />
   );

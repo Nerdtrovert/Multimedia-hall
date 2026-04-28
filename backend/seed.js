@@ -21,9 +21,9 @@ const seed = async () => {
 
   const users = [
     { name: 'System Admin', email: 'admin@auditorium.com', password: adminPass, role: 'admin', college_name: null },
-    { name: 'Dr H N National College of Engineering Rep', email: 'college_a@edu.com', password: collegePass, role: 'college', college_name: 'Dr H N National College of Engineering' },
-    { name: 'National College Jayanagar Rep', email: 'college_b@edu.com', password: collegePass, role: 'college', college_name: 'National College Jayanagar' },
-    { name: 'National PU College Rep', email: 'college_c@edu.com', password: collegePass, role: 'college', college_name: 'National PU College' },
+    { name: 'Dr H N National College of Engineering', email: 'college_a@edu.com', password: collegePass, role: 'college', college_name: 'Dr H N National College of Engineering' },
+    { name: 'National College Jayanagar', email: 'college_b@edu.com', password: collegePass, role: 'college', college_name: 'National College Jayanagar' },
+    { name: 'National PU College', email: 'college_c@edu.com', password: collegePass, role: 'college', college_name: 'National PU College' },
   ];
 
   for (const u of users) {
@@ -40,16 +40,6 @@ const seed = async () => {
     ['Emergency Supervisor', supervisorEmail, supervisorPassHash, 'supervisor', null]
   );
 
-  if (supervisorInsert.affectedRows > 0) {
-    console.log(`✓ Seeded one-time supervisor account: ${supervisorEmail}`);
-    console.log(`  Supervisor password (save securely): ${supervisorPassword}`);
-  } else {
-    console.log(`✓ Supervisor account already exists: ${supervisorEmail}`);
-  }
-
-  console.log('\nSeed complete!');
-  console.log('Admin login:    admin@auditorium.com  /  admin123');
-  console.log('College login:  college_a@edu.com     /  college123');
   process.exit(0);
 };
 
