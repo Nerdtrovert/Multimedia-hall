@@ -1,3 +1,124 @@
+.navbar-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  background: #ffffff;
+}
+
+/* BRANDING HEADER STYLES */
+.branding-header {
+  color: #1a237e; /* Navy blue */
+}
+
+/* Dark blue top strip */
+.navy-strip {
+  background-color: #1a237e;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 5%;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.erp-login-btn {
+    background-color: #f78117; /* Bright orange */
+    padding: 6px 18px;
+    border-radius: 4px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+/* Main logo/address section layout */
+.logo-address-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 5%;
+}
+
+.center-text-group {
+    text-align: center;
+    flex: 2;
+}
+
+.center-text-group h1 {
+    font-size: 2.3rem;
+    font-weight: 800;
+    margin-bottom: 5px;
+    letter-spacing: -1px;
+}
+
+.affiliation-text, .address-text {
+    font-size: 0.85rem;
+    margin: 0;
+    font-weight: 500;
+}
+
+/* Image styles */
+.college-logo { height: 120px; }
+.estd-text { font-size: 0.75rem; font-weight: bold; text-align: center; margin-top: 5px; }
+
+.founder-image { 
+    height: 100px; 
+    border-radius: 50%; /* Rounded crop from image */
+    border: 3px solid #1a237e; 
+}
+.founder-caption { font-size: 0.75rem; text-align: center; font-weight: 600; margin-top: 5px; }
+.award-text { font-weight: bold; color: #555; }
+
+
+/* NAVIGATION LINKS BAR (Generic Links) */
+.nav-links-bar {
+  background-color: #1a237e; /* Standard navy */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 5%;
+}
+
+.links-left {
+  display: flex;
+  gap: 25px;
+}
+
+.links-left a {
+  text-decoration: none;
+  color: white;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: color 0.3s ease;
+}
+
+.links-left a:hover {
+  color: #f78117; /* Highlight hover in orange */
+}
+
+.links-right {
+    display: flex;
+    align-items: center;
+    color: white;
+}
+
+.welcome-username { margin-right: 15px; font-size: 0.9rem; }
+
+.logout-btn {
+  background-color: #f78117;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.logout-btn:hover {
+    background-color: white;
+    color: #f78117;
 /* ─── Navbar Container ───────────────────────── */
 .navbar {
   display: flex;
