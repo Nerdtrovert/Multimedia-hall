@@ -106,6 +106,17 @@ const CalendarView = () => {
     });
   };
 
+  const getDayCellClassNames = (arg) => {
+    if (user?.role !== 'college') return [];
+
+    const cellDate = formatDateKey(arg.date);
+    if (cellDate < todayDate) {
+      return ['calendar-day-disabled'];
+    }
+
+    return [];
+  };
+
   const openEventReport = async (url) => {
     if (!url) return;
     try {
@@ -148,7 +159,7 @@ const CalendarView = () => {
             events={events}
             eventClick={handleEventClick}
             dateClick={handleDateClick}
-            validRange={user?.role === 'college' ? { start: todayDate } : undefined}
+            dayCellClassNames={getDayCellClassNames}
 
             eventContent={(eventInfo) => {
               const { title, start, extendedProps } = eventInfo.event;

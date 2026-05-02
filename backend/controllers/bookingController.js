@@ -56,6 +56,18 @@ const toDateKey = (dateValue) => {
   return String(dateValue).split('T')[0];
 };
 
+const toTimeMinutes = (timeValue) => {
+  const [hours, minutes] = String(timeValue || '')
+    .split(':')
+    .map((part) => Number.parseInt(part, 10));
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return Number.NaN;
+  }
+
+  return hours * 60 + minutes;
+};
+
 const toApiPosterUrl = (booking) => {
   if (Number(booking.has_poster || 0) > 0 || booking.poster_file_path) {
     return `/api/bookings/${booking.id}/poster`;
@@ -148,7 +160,11 @@ const createBooking = async (req, res) => {
   const { id: user_id, college_name } = req.user;
   const posterFile = req.file || null;
   const normalizedEventDate = String(event_date || '').split('T')[0];
-  const todayKey = toDateKey(new Date());
+  const now = new Date();
+  const todayKey = toDateKey(now);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = toTimeMinutes(start_time);
+  const endMinutes = toTimeMinutes(end_time);
 
   if (!title || !event_date || !start_time || !end_time) {
     return res.status(400).json({
@@ -167,6 +183,18 @@ const createBooking = async (req, res) => {
   if (start_time >= end_time) {
     return res.status(400).json({
       message: 'Start time must be before end time.',
+    });
+  }
+
+  if (Number.isNaN(startMinutes) || Number.isNaN(endMinutes)) {
+    return res.status(400).json({
+      message: 'Invalid start or end time.',
+    });
+  }
+
+  if (normalizedEventDate === todayKey && startMinutes <= currentMinutes) {
+    return res.status(400).json({
+      message: 'Bookings for today must use a future start time.',
     });
   }
 

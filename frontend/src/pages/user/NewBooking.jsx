@@ -42,6 +42,11 @@ const getTodayKey = () => {
   return `${year}-${month}-${day}`;
 };
 
+const getCurrentMinutes = () => {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+};
+
 const NewBooking = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,6 +65,7 @@ const NewBooking = () => {
   const [bookingsByDate, setBookingsByDate] = useState({});
 
   const today = getTodayKey();
+  const currentMinutes = getCurrentMinutes();
   const timeSlots = useMemo(buildTimeSlots, []);
 
   /* ===============================
@@ -124,6 +130,7 @@ const NewBooking = () => {
   const bookedRanges = form.event_date
     ? bookingsByDate[form.event_date] || []
     : [];
+  const isTodaySelection = form.event_date === today;
 
   const startOptions = timeSlots.slice(0, -1).map((time) => {
     const startMinutes = toMinutes(time);
@@ -131,7 +138,9 @@ const NewBooking = () => {
 
     return {
       value: time,
-      disabled: hasOverlap(startMinutes, endMinutes, bookedRanges),
+      disabled:
+        (isTodaySelection && startMinutes <= currentMinutes) ||
+        hasOverlap(startMinutes, endMinutes, bookedRanges),
     };
   });
 
@@ -145,6 +154,7 @@ const NewBooking = () => {
       value: time,
       disabled:
         !form.start_time ||
+        (isTodaySelection && endMinutes <= currentMinutes) ||
         endMinutes <= startMinutes ||
         hasOverlap(startMinutes, endMinutes, bookedRanges),
     };
@@ -193,6 +203,11 @@ const NewBooking = () => {
 
     if (form.event_date < today) {
       toast.error('Bookings cannot be created for past dates.');
+      return;
+    }
+
+    if (form.event_date === today && toMinutes(form.start_time) <= currentMinutes) {
+      toast.error('For today, choose a future start time.');
       return;
     }
 
