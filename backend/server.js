@@ -14,6 +14,7 @@ const { ensureSupervisorAccount } = require('./services/supervisorAccount');
 const { actionLogger } = require('./middleware/actionLogger');
 const { initializeFirebaseAdmin } = require('./utils/firebaseUtils');
 const { logError } = require('./utils/audit');
+const db = require('./config/db');
 
 const app = express();
 
@@ -36,7 +37,24 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/firebase', firebaseRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+app.get('/api/health', async (req, res) => {
+  try {
+    await db.query('SELECT 1');
+    return res.json({
+      status: 'ok',
+      database: 'ok',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logError('Health check failed: database unavailable', error);
+    return res.status(503).json({
+      status: 'degraded',
+      database: 'down',
+      message: 'Database unavailable.',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
 // ─── 404 handler ─────────────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ message: 'Route not found.' }));

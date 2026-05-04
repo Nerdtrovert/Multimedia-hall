@@ -34,6 +34,16 @@ const appendActionLog = (message) => {
   }
 };
 
+const formatActorIdentity = (actor) => {
+  const username = String(actor?.username || '').trim();
+  const email = String(actor?.email || '').trim();
+
+  if (username && email) return `${username} | ${email}`;
+  if (email) return email;
+  if (username) return username;
+  return 'unknown user';
+};
+
 const appendAuditAction = (action, details) => {
   if (!details) return;
 
@@ -63,4 +73,11 @@ const logAudit = async (action, performedBy, targetBookingId, details) => {
   }
 };
 
-module.exports = { logAudit, appendActionLog, logError, actionLogPath, ensureActionLogFile };
+module.exports = {
+  logAudit,
+  appendActionLog,
+  logError,
+  actionLogPath,
+  ensureActionLogFile,
+  formatActorIdentity,
+};

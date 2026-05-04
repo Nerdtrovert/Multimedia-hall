@@ -92,6 +92,15 @@
 .mini.approved { background: #d1fae5; color: #065f46; }
 .mini.rejected { background: #fee2e2; color: #991b1b; }
 
+.stat-period-label {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ─── Actions ─────────────────────────────── */
 .dashboard-actions {
   display: grid;
@@ -125,6 +134,19 @@
 
 .action-card.primary strong { color: white; }
 .action-card.primary p     { color: rgba(255,255,255,0.7); }
+
+.action-card.danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.action-card.danger strong {
+  color: #b91c1c;
+}
+
+.action-card.danger p {
+  color: #7f1d1d;
+}
 
 .action-icon {
   font-size: 30px;
@@ -241,6 +263,17 @@
 .link-btn:hover {
   text-decoration: underline;
 }
+
+.supervisor-tools {
+  margin-bottom: 18px;
+}
+
+.supervisor-tools-note {
+  color: #4b5563;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
 .filter-bar {
   border-radius: 8px;
   margin-bottom: 18px;

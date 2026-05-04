@@ -11,7 +11,7 @@ const {
   sendBookingStatusPush,
   sendNewBookingRequestPush,
 } = require('../utils/pushNotifications');
-const { logAudit, logError } = require('../utils/audit');
+const { logAudit, logError, formatActorIdentity } = require('../utils/audit');
 
 const uploadsRoot = path.join(__dirname, '..', 'uploads');
 const bookingListSelect = `
@@ -261,7 +261,7 @@ const createBooking = async (req, res) => {
       'BOOKING_CREATED',
       user_id,
       result.insertId,
-      `${req.user.email || college_name} requested "${title}" for ${normalizedEventDate}`
+      `${formatActorIdentity(req.user)} requested "${title}" for ${normalizedEventDate}`
     );
 
     setImmediate(() => {
@@ -689,7 +689,7 @@ const updateBookingStatus = async (req, res) => {
       'BOOKING_STATUS_UPDATED',
       req.user.id,
       id,
-      `${req.user.email || 'admin'} ${status === 'approved' ? 'accepted' : 'rejected'} "${booking.title}" requested by ${booking.college_name}`
+      `${formatActorIdentity(req.user)} ${status === 'approved' ? 'accepted' : 'rejected'} "${booking.title}" requested by ${booking.college_name}`
     );
 
     res.json({

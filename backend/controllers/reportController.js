@@ -1,7 +1,7 @@
 const db = require("../config/db");
 const PDFDocument = require("pdfkit");
 const ExcelJS = require("exceljs");
-const { logAudit, logError, actionLogPath, ensureActionLogFile } = require("../utils/audit");
+const { logAudit, logError, actionLogPath, ensureActionLogFile, formatActorIdentity } = require("../utils/audit");
 
 // ─── Helper: fetch bookings for report ───────────────────────────────────────
 async function fetchBookingsForReport(filters, userId = null) {
@@ -306,9 +306,25 @@ const getAnalytics = async (req, res) => {
   try {
     const [totalByCollege] = await db.query(
       `SELECT college_name, COUNT(*) as total,
-              SUM(status='approved') as approved,
-              SUM(status='rejected') as rejected,
-              SUM(status='pending') as pending
+              SUM(status='pending') as pending,
+              SUM(
+                CASE
+                  WHEN status = 'approved'
+                    AND YEAR(updated_at) = YEAR(CURDATE())
+                    AND MONTH(updated_at) = MONTH(CURDATE())
+                  THEN 1
+                  ELSE 0
+                END
+              ) as approved,
+              SUM(
+                CASE
+                  WHEN status = 'rejected'
+                    AND YEAR(updated_at) = YEAR(CURDATE())
+                    AND MONTH(updated_at) = MONTH(CURDATE())
+                  THEN 1
+                  ELSE 0
+                END
+              ) as rejected
        FROM bookings GROUP BY college_name`,
     );
 
@@ -333,7 +349,7 @@ const downloadActionLogs = async (req, res) => {
       "ACTION_LOG_DOWNLOADED",
       req.user.id,
       null,
-      `Action log downloaded by ${req.user.email}`
+      `Action log downloaded by ${formatActorIdentity(req.user)}`
     );
 
     const filename = `actions-${new Date().toISOString().slice(0, 10)}.log`;

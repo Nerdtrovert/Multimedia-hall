@@ -50,6 +50,12 @@ export const forgotPassword = (email) =>
   api.post("/auth/forgot-password", { email });
 export const changePassword = (oldPassword, newPassword) =>
   api.post("/auth/change-password", { oldPassword, newPassword });
+export const getSupervisorResetTargets = () =>
+  api.get('/auth/_internal/maintenance/reset-user-targets');
+export const supervisorResetUserEmail = (username, email) =>
+  api.post('/auth/_internal/maintenance/reset-user-email', { username, email });
+export const supervisorResetOperationalData = () =>
+  api.post('/auth/_internal/maintenance/reset-operational-data');
 export const registerPushToken = (token) => api.post('/auth/push-token', { token });
 export const unregisterPushToken = (token) =>
   api.delete('/auth/push-token', { data: token ? { token } : {} });

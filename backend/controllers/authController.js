@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../config/db');
 const { normalizeEmail, isValidEmail, sendPasswordResetEmail } = require('../utils/mailer');
-const { logError } = require('../utils/audit');
+const { appendActionLog, logError, formatActorIdentity } = require('../utils/audit');
 const {
   saveUserPushToken,
   removeUserPushToken,
@@ -47,6 +47,7 @@ const login = async (req, res) => {
 
     const payload = {
       id: user.id,
+      username: user.username,
       email: user.email,
       role: user.role,
       name: user.name,
@@ -107,6 +108,7 @@ const supervisorLogin = async (req, res) => {
 
     const payload = {
       id: user.id,
+      username: user.username,
       email: user.email,
       role: user.role,
       name: user.name,
@@ -134,7 +136,7 @@ const supervisorLogin = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT id, name, email, role, college_name, created_at FROM users WHERE id = ?',
+      'SELECT id, username, name, email, role, college_name, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
     if (rows.length === 0) return res.status(404).json({ message: 'User not found.' });
@@ -268,12 +270,144 @@ const changePassword = async (req, res) => {
   }
 };
 
+const supervisorResetUserEmail = async (req, res) => {
+  const username = String(req.body?.username || '').trim();
+  const updatedEmail = normalizeEmail(req.body?.email);
+
+  if (!username || !updatedEmail) {
+    return res.status(400).json({ message: 'Username and new email are required.' });
+  }
+
+  if (!isValidEmail(updatedEmail)) {
+    return res.status(400).json({ message: 'Enter a valid new email address.' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      'SELECT id, name, username, email, password, role FROM users WHERE username = ? LIMIT 1',
+      [username]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User not found for the provided username.' });
+    }
+
+    const targetUser = rows[0];
+
+    if (targetUser.role !== 'college') {
+      return res.status(403).json({ message: 'Only college account emails can be changed from this screen.' });
+    }
+
+    if (normalizeEmail(targetUser.email) === updatedEmail) {
+      return res.status(400).json({ message: 'New email must be different from the current email.' });
+    }
+
+    const [emailRows] = await db.query(
+      'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
+      [updatedEmail, targetUser.id]
+    );
+
+    if (emailRows.length > 0) {
+      return res.status(409).json({ message: 'This email is already used by another user.' });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    const newPasswordHash = await bcrypt.hash(temporaryPassword, 10);
+
+    await db.query('UPDATE users SET email = ?, password = ? WHERE id = ?', [
+      updatedEmail,
+      newPasswordHash,
+      targetUser.id,
+    ]);
+
+    try {
+      await sendPasswordResetEmail(updatedEmail, targetUser.name, temporaryPassword);
+    } catch (mailErr) {
+      await db.query('UPDATE users SET email = ?, password = ? WHERE id = ?', [
+        targetUser.email,
+        targetUser.password,
+        targetUser.id,
+      ]);
+      throw mailErr;
+    }
+
+    appendActionLog(
+      `SUPERVISOR EMAIL RESET | ${formatActorIdentity(req.user)} changed ${targetUser.username} email to ${updatedEmail}`
+    );
+
+    return res.json({
+      message: 'Email updated. A temporary password has been sent to the new email. Ask the user to change it after first login.',
+    });
+  } catch (err) {
+    logError('Supervisor reset user email error', err);
+    return res.status(500).json({ message: 'Unable to update email right now.' });
+  }
+};
+
+const listSupervisorResetUsers = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT username, name, email, role, college_name
+       FROM users
+       WHERE username IS NOT NULL
+         AND role = 'college'
+       ORDER BY name ASC`
+    );
+    return res.json(rows);
+  } catch (err) {
+    logError('List supervisor reset users error', err);
+    return res.status(500).json({ message: 'Unable to fetch usernames right now.' });
+  }
+};
+
+const supervisorResetOperationalData = async (req, res) => {
+  try {
+    const [tableRows] = await db.query(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = DATABASE()
+         AND table_type = 'BASE TABLE'
+         AND table_name <> 'users'`
+    );
+
+    const tableNames = tableRows.map((row) => row.table_name).filter(Boolean);
+
+    if (tableNames.length === 0) {
+      return res.json({ message: 'No non-user tables found to reset.', truncatedTables: [] });
+    }
+
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    try {
+      for (const tableName of tableNames) {
+        await db.query(`TRUNCATE TABLE \`${String(tableName).replace(/`/g, '``')}\``);
+      }
+    } finally {
+      await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    }
+
+    appendActionLog(
+      `SUPERVISOR DATA RESET | ${formatActorIdentity(req.user)} truncated tables (users preserved): ${tableNames.join(', ')}`
+    );
+
+    return res.json({
+      message: 'Database reset complete. All non-user tables were truncated and users were preserved.',
+      truncatedTables: tableNames,
+    });
+  } catch (err) {
+    logError('Supervisor reset operational data error', err);
+    return res.status(500).json({ message: 'Unable to reset operational data right now.' });
+  }
+};
+
 module.exports = {
   login,
   supervisorLogin,
   getMe,
   forgotPassword,
   changePassword,
+  supervisorResetUserEmail,
+  listSupervisorResetUsers,
+  supervisorResetOperationalData,
   registerPushToken,
   unregisterPushToken,
 };

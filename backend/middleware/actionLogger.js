@@ -1,4 +1,4 @@
-const { appendActionLog } = require('../utils/audit');
+const { appendActionLog, formatActorIdentity } = require('../utils/audit');
 
 const actionLogger = (req, res, next) => {
   if (!req.originalUrl.startsWith('/api/')) {
@@ -9,7 +9,7 @@ const actionLogger = (req, res, next) => {
     const actor = req.user || req.auditActor || null;
 
     if (req.auditAction === 'LOGIN_SUCCESS' || req.auditAction === 'SUPERVISOR_LOGIN_SUCCESS') {
-      appendActionLog(`LOGIN | ${actor?.email || 'unknown user'} logged in`);
+      appendActionLog(`LOGIN | ${formatActorIdentity(actor)} logged in`);
     }
   });
 

@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { getPendingBookings, getAnalytics, downloadActionLogs } from '../../utils/api';
+import {
+  getPendingBookings,
+  getAnalytics,
+  downloadActionLogs,
+  getSupervisorResetTargets,
+  supervisorResetUserEmail,
+  supervisorResetOperationalData,
+} from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/common/Navbar';
 import StatusBadge from '../../components/common/StatusBadge';
@@ -15,6 +22,10 @@ const AdminDashboard = () => {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloadingLogs, setDownloadingLogs] = useState(false);
+  const [resettingDb, setResettingDb] = useState(false);
+  const [emailResetForm, setEmailResetForm] = useState({ username: '', email: '' });
+  const [resetTargets, setResetTargets] = useState([]);
+  const [updatingEmail, setUpdatingEmail] = useState(false);
 
   const fetchDashboardData = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -31,6 +42,21 @@ const AdminDashboard = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
   useAutoRefresh(() => fetchDashboardData(false), 10000);
+
+  useEffect(() => {
+    if (!isSupervisor) return;
+
+    const fetchResetTargets = async () => {
+      try {
+        const response = await getSupervisorResetTargets();
+        setResetTargets(response.data || []);
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Unable to load usernames for reset.');
+      }
+    };
+
+    fetchResetTargets();
+  }, [isSupervisor]);
 
   const handleDownloadActionLogs = async () => {
     setDownloadingLogs(true);
@@ -51,6 +77,45 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleSupervisorEmailReset = async (event) => {
+    event.preventDefault();
+    setUpdatingEmail(true);
+    try {
+      const response = await supervisorResetUserEmail(emailResetForm.username, emailResetForm.email);
+      toast.success(response.data?.message || 'User email updated and temporary password sent.');
+      setResetTargets((prev) =>
+        prev.map((target) =>
+          target.username === emailResetForm.username
+            ? { ...target, email: emailResetForm.email.trim() }
+            : target
+        )
+      );
+      setEmailResetForm({ username: '', email: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to update user email.');
+    } finally {
+      setUpdatingEmail(false);
+    }
+  };
+
+  const handleSupervisorDbReset = async () => {
+    const confirmed = window.confirm(
+      'This will permanently clear bookings, reports, logs, and other runtime data. Users will be preserved. Continue?'
+    );
+    if (!confirmed) return;
+
+    setResettingDb(true);
+    try {
+      const response = await supervisorResetOperationalData();
+      toast.success(response.data?.message || 'Operational data reset complete.');
+      await fetchDashboardData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to reset operational data.');
+    } finally {
+      setResettingDb(false);
+    }
+  };
+
   return (
     <div>
       <Navbar />
@@ -67,6 +132,7 @@ const AdminDashboard = () => {
                 <div className="stat-college-name">{c.college_name}</div>
                 <div className="stat-mini-row">
                   <span className="mini pending">{c.pending} pending</span>
+                  <span className="stat-period-label">This month</span>
                   <span className="mini approved">{c.approved} approved</span>
                   <span className="mini rejected">{c.rejected} rejected</span>
                 </div>
@@ -111,7 +177,60 @@ const AdminDashboard = () => {
               </div>
             </button>
           )}
+          {isSupervisor && (
+            <button
+              type="button"
+              className="action-card action-card-button danger"
+              onClick={handleSupervisorDbReset}
+              disabled={resettingDb}
+            >
+              <span className="action-icon">🗑️</span>
+              <div>
+                <strong>{resettingDb ? 'Resetting...' : 'Reset DB (Keep Users)'}</strong>
+                <p>Supervisor-only truncate of all non-user tables</p>
+              </div>
+            </button>
+          )}
         </div>
+
+        {isSupervisor && (
+          <section className="recent-section supervisor-tools">
+            <h3>Supervisor User Email Reset</h3>
+            <p className="supervisor-tools-note">
+              Enter a stable username and new email. A temporary password will be sent to the new email, and the user must change it on first login.
+            </p>
+            <form className="filter-form" onSubmit={handleSupervisorEmailReset}>
+              <select
+                className="input"
+                value={emailResetForm.username}
+                onChange={(event) =>
+                  setEmailResetForm((prev) => ({ ...prev, username: event.target.value }))
+                }
+                required
+              >
+                <option value="" disabled>Select username</option>
+                {resetTargets.map((target) => (
+                  <option key={target.username} value={target.username}>
+                    {target.username} | {target.email}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input"
+                type="email"
+                placeholder="new-email@domain.com"
+                value={emailResetForm.email}
+                onChange={(event) =>
+                  setEmailResetForm((prev) => ({ ...prev, email: event.target.value }))
+                }
+                required
+              />
+              <button type="submit" className="btn btn-primary" disabled={updatingEmail}>
+                {updatingEmail ? 'Updating...' : 'Update Email + Send Password'}
+              </button>
+            </form>
+          </section>
+        )}
 
         <div className="recent-section">
           <h3>Pending Requests ({pending.length})</h3>

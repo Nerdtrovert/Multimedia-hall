@@ -7,6 +7,7 @@ USE auditorium_db;
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(100) UNIQUE NOT NULL,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(150) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
@@ -76,8 +77,9 @@ CREATE TABLE IF NOT EXISTS report_reminder_logs (
 );
 
 -- Seeded users are managed in backend/seed.js.
--- Update email addresses there, then run `npm run seed` to insert or update the admin/college accounts.
-
+-- Update email addresses there, then run `npm run seed` to upsert by stable username without changing user IDs.
 -- For existing databases, run this migration once:
 -- ALTER TABLE bookings ADD COLUMN event_report_data LONGBLOB NULL AFTER end_time;
 -- ALTER TABLE users MODIFY COLUMN role ENUM('admin','supervisor','college') NOT NULL DEFAULT 'college';
+-- ALTER TABLE users ADD COLUMN username VARCHAR(100) NULL AFTER id;
+-- CREATE UNIQUE INDEX uq_users_username ON users (username);
