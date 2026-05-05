@@ -50,6 +50,12 @@ export const forgotPassword = (email) =>
   api.post("/auth/forgot-password", { email });
 export const changePassword = (oldPassword, newPassword) =>
   api.post("/auth/change-password", { oldPassword, newPassword });
+export const getSupervisorResetTargets = () =>
+  api.get('/auth/_internal/maintenance/reset-user-targets');
+export const supervisorResetUserEmail = (username, email) =>
+  api.post('/auth/_internal/maintenance/reset-user-email', { username, email });
+export const supervisorResetOperationalData = () =>
+  api.post('/auth/_internal/maintenance/reset-operational-data', { confirm: 'RESET' });
 export const registerPushToken = (token) => api.post('/auth/push-token', { token });
 export const unregisterPushToken = (token) =>
   api.delete('/auth/push-token', { data: token ? { token } : {} });
@@ -84,6 +90,7 @@ export const downloadExcel = (params) =>
 export const getAnalytics = () => api.get("/reports/analytics");
 export const downloadActionLogs = () =>
   api.get("/reports/action-logs/download", { responseType: "blob" });
+export const clearActionLogs = () => api.delete("/reports/action-logs");
 
 export const toApiFileUrl = (relativePath) =>
   relativePath ? `${resolveApiOrigin()}${relativePath}` : null;

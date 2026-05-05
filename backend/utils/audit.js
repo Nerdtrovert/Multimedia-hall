@@ -34,6 +34,16 @@ const appendActionLog = (message) => {
   }
 };
 
+const formatActorIdentity = (actor) => {
+  const username = String(actor?.username || '').trim();
+  const email = String(actor?.email || '').trim();
+
+  if (username && email) return `${username} | ${email}`;
+  if (email) return email;
+  if (username) return username;
+  return 'unknown user';
+};
+
 const appendAuditAction = (action, details) => {
   if (!details) return;
 
@@ -41,6 +51,12 @@ const appendAuditAction = (action, details) => {
     appendActionLog(`REQUEST | ${details}`);
   } else if (action === 'BOOKING_STATUS_UPDATED') {
     appendActionLog(`ADMIN ACTION | ${details}`);
+  } else if (action === 'BOOKING_CANCELLED_BY_USER') {
+    appendActionLog(`REQUEST CANCELLED | ${details}`);
+  } else if (action === 'EVENT_REPORT_UPLOADED') {
+    appendActionLog(`REPORT UPLOADED | ${details}`);
+  } else if (action === 'ACTION_LOG_DOWNLOADED') {
+    appendActionLog(`ACTION LOG | ${details}`);
   }
 };
 
@@ -63,4 +79,11 @@ const logAudit = async (action, performedBy, targetBookingId, details) => {
   }
 };
 
-module.exports = { logAudit, appendActionLog, logError, actionLogPath, ensureActionLogFile };
+module.exports = {
+  logAudit,
+  appendActionLog,
+  logError,
+  actionLogPath,
+  ensureActionLogFile,
+  formatActorIdentity,
+};

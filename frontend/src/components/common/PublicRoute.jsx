@@ -4,8 +4,12 @@ import { isRunningInstalledApp } from '../../utils/pushNotifications';
 
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  const isAdminLikeRole = ['admin', 'supervisor'].includes(user?.role);
   const isInstalledApp = isRunningInstalledApp();
+  const dashboardPathByRole = user?.role === 'supervisor'
+    ? '/supervisor/dashboard'
+    : user?.role === 'admin'
+      ? '/admin/dashboard'
+      : '/user/dashboard';
 
   if (loading) {
     return <div className="loading-screen">Loading...</div>;
@@ -15,7 +19,7 @@ const PublicRoute = ({ children }) => {
   if (user && isInstalledApp) {
     return (
       <Navigate
-        to={isAdminLikeRole ? '/admin/dashboard' : '/user/dashboard'}
+        to={dashboardPathByRole}
         replace
       />
     );

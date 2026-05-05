@@ -84,11 +84,21 @@ const persistAuth = ({ token, user, rememberMe }) => {
 };
 
 const preloadRoutes = (role) => {
-  if (['admin', 'supervisor'].includes(role)) {
+  if (role === 'admin') {
     Promise.allSettled([
       import('../pages/admin/AdminDashboard'),
       import('../pages/admin/AdminRequests'),
       import('../pages/admin/AllBookings'),
+      import('../pages/CalendarView'),
+      import('../pages/Reports'),
+      import('../pages/ChangePassword'),
+    ]);
+    return;
+  }
+
+  if (role === 'supervisor') {
+    Promise.allSettled([
+      import('../pages/supervisor/SupervisorDashboard'),
       import('../pages/CalendarView'),
       import('../pages/Reports'),
       import('../pages/ChangePassword'),
@@ -143,13 +153,15 @@ export const AuthProvider = ({ children }) => {
       window.isSecureContext &&
       'Notification' in window;
 
-    const setupPush = (requestPermission) => {
+    const setupPush = (requestPermission = true) => {
       enablePushNotifications({ requestPermission, userId: user.id }).catch((err) => {
         console.error('Push notifications setup failed:', err);
       });
     };
 
-    setupPush(canPromptForPush);
+    if (typeof window !== 'undefined') {
+      setupPush(true);
+    };
 
     const onAppInstalled = () => {
       setupPush(true);
@@ -196,13 +208,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const performLogin = async (
-    email,
-    password,
-    endpoint = '/auth/login',
-    shouldRememberMe = false
-  ) => {
-    const res = await api.post(endpoint, { email, password });
+  const performLogin = async (payload, endpoint = '/auth/login', shouldRememberMe = false) => {
+    const res = await api.post(endpoint, payload);
     const { token: newToken, user: rawUserData } = res.data;
     const userData = normalizeUser(rawUserData);
     setToken(newToken);
@@ -210,14 +217,15 @@ export const AuthProvider = ({ children }) => {
     setRememberMe(shouldRememberMe);
     persistAuth({ token: newToken, user: userData, rememberMe: shouldRememberMe });
     setLoading(false);
+
     preloadRoutes(userData.role);
     return userData;
   };
 
   const login = async (email, password, shouldRememberMe = false) =>
-    performLogin(email, password, '/auth/login', shouldRememberMe);
-  const loginSupervisor = async (email, password) =>
-    performLogin(email, password, '/auth/_internal/maintenance/supervisor-access');
+    performLogin({ email, password }, '/auth/login', shouldRememberMe);
+  const loginSupervisor = async (password) =>
+    performLogin({ password }, '/auth/_internal/maintenance/supervisor-access');
 
   const logout = () => {
     disablePushNotifications().catch((err) => {

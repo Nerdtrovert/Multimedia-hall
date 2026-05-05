@@ -33,8 +33,10 @@ const Login = () => {
 
       toast.success(`Welcome, ${userData.name}!`);
 
-      if (['admin', 'supervisor'].includes(userData.role)) {
+      if (userData.role === 'admin') {
         navigate('/admin/dashboard');
+      } else if (userData.role === 'supervisor') {
+        navigate('/supervisor/dashboard');
       } else {
         navigate('/user/dashboard');
       }
@@ -139,7 +141,6 @@ const Login = () => {
                   Forgot password?
                 </Link>
               </div>
-
               <button className="submit-btn" disabled={loading}>
                 {loading ? 'Signing in...' : 'Login'}
               </button>

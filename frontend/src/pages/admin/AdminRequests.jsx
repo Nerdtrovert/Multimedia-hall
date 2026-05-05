@@ -74,7 +74,7 @@ const AdminRequests = () => {
                 <div className="request-header">
                   <span className="college-tag">{b.college_name}</span>
                   <span className="submitted-date">
-                    Submitted {new Date(b.created_at).toLocaleDateString()}
+                    Submitted {new Date(b.created_at).toLocaleDateString('en-GB')}
                   </span>
                 </div>
                 <h3 className="request-title">{b.title}</h3>
@@ -95,7 +95,7 @@ const AdminRequests = () => {
                   )}
                 </div>
                 <div className="request-meta">
-                  <span>📅 {new Date(b.event_date).toDateString()}</span>
+                  <span>📅 {new Date(b.event_date).toLocaleDateString('en-GB')}</span>
                   <span>🕐 {b.start_time} – {b.end_time}</span>
                 </div>
                 <div className="request-actions">
@@ -128,7 +128,7 @@ const AdminRequests = () => {
             </h3>
             <p>
               <strong>{modal.booking.title}</strong> —{' '}
-              {new Date(modal.booking.event_date).toDateString()}
+              {new Date(modal.booking.event_date).toLocaleDateString('en-GB')}
             </p>
             <div className="form-group">
               <label>Optional Note to College</label>

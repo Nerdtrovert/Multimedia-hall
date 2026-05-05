@@ -1,7 +1,15 @@
+const fs = require("fs");
 const db = require("../config/db");
 const PDFDocument = require("pdfkit");
 const ExcelJS = require("exceljs");
-const { logAudit, logError, actionLogPath, ensureActionLogFile } = require("../utils/audit");
+const {
+  logAudit,
+  logError,
+  actionLogPath,
+  ensureActionLogFile,
+  formatActorIdentity,
+  appendActionLog,
+} = require("../utils/audit");
 
 // ─── Helper: fetch bookings for report ───────────────────────────────────────
 async function fetchBookingsForReport(filters, userId = null) {
@@ -10,9 +18,13 @@ async function fetchBookingsForReport(filters, userId = null) {
 
   let query = `
     SELECT b.id, b.college_name, b.title, b.purpose,
-           DATE_FORMAT(b.event_date, '%Y-%m-%d') AS event_date,
+           DATE_FORMAT(b.event_date, '%d/%m/%Y') AS event_date,
            b.start_time, b.end_time, b.status, b.admin_note, b.created_at,
            b.poster_file_path, b.event_report_file_path,
+           CASE
+             WHEN b.poster_data IS NOT NULL OR b.poster_file_path IS NOT NULL THEN 1
+             ELSE 0
+           END AS has_poster,
            CASE
              WHEN b.event_report_data IS NOT NULL OR b.event_report_file_path IS NOT NULL THEN 1
              ELSE 0
@@ -138,8 +150,9 @@ const generatePDF = async (req, res) => {
         };
 
         if (linkUrl && !isHeader) {
-          doc.fillColor("#1d4ed8").underline(true);
+          doc.fillColor("#1d4ed8");
           textOpts.link = linkUrl;
+          textOpts.underline = true;
         } else {
           doc.fillColor(isHeader ? "white" : "#111827");
         }
@@ -189,8 +202,8 @@ const generatePDF = async (req, res) => {
       const isEven = idx % 2 === 0;
       drawRowBg(currentY, false, isEven);
 
-      const posterUrl = b.poster_file_path
-        ? `${apiBaseUrl}/uploads/${b.poster_file_path.replace(/\\/g, "/")}`
+      const posterUrl = Number(b.has_poster || 0) > 0
+        ? `${apiBaseUrl}/api/bookings/${b.id}/poster`
         : null;
 
       const reportUrl = Number(b.has_event_report || 0) > 0
@@ -217,7 +230,10 @@ const generatePDF = async (req, res) => {
     doc.end();
   } catch (err) {
     logError("PDF generation error", err);
-    res.status(500).json({ message: "Failed to generate PDF." });
+    if (!res.headersSent) {
+      return res.status(500).json({ message: "Failed to generate PDF." });
+    }
+    return res.end();
   }
 };
 // ─── Generate CSV/Excel report ────────────────────────────────────────────────
@@ -263,13 +279,13 @@ const generateExcel = async (req, res) => {
         event_date: b.event_date,
         start_time: b.start_time,
         end_time: b.end_time,
-        status: b.status.toUpperCase(),
+        status: b.status?.toUpperCase() || "—",
       });
 
-      if (b.poster_file_path) {
+      if (Number(b.has_poster || 0) > 0) {
         row.getCell('poster_url').value = {
           text: 'View Poster',
-          hyperlink: `${apiBaseUrl}/uploads/${b.poster_file_path.replace(/\\/g, '/')}`,
+          hyperlink: `${apiBaseUrl}/api/bookings/${b.id}/poster`,
         };
       } else {
         row.getCell('poster_url').value = "—";
@@ -297,7 +313,10 @@ const generateExcel = async (req, res) => {
     res.end();
   } catch (err) {
     logError("Excel generation error", err);
-    res.status(500).json({ message: "Failed to generate Excel report." });
+    if (!res.headersSent) {
+      return res.status(500).json({ message: "Failed to generate Excel report." });
+    }
+    return res.end();
   }
 };
 
@@ -306,9 +325,25 @@ const getAnalytics = async (req, res) => {
   try {
     const [totalByCollege] = await db.query(
       `SELECT college_name, COUNT(*) as total,
-              SUM(status='approved') as approved,
-              SUM(status='rejected') as rejected,
-              SUM(status='pending') as pending
+              SUM(status='pending') as pending,
+              SUM(
+                CASE
+                  WHEN status = 'approved'
+                    AND YEAR(updated_at) = YEAR(CURDATE())
+                    AND MONTH(updated_at) = MONTH(CURDATE())
+                  THEN 1
+                  ELSE 0
+                END
+              ) as approved,
+              SUM(
+                CASE
+                  WHEN status = 'rejected'
+                    AND YEAR(updated_at) = YEAR(CURDATE())
+                    AND MONTH(updated_at) = MONTH(CURDATE())
+                  THEN 1
+                  ELSE 0
+                END
+              ) as rejected
        FROM bookings GROUP BY college_name`,
     );
 
@@ -333,7 +368,7 @@ const downloadActionLogs = async (req, res) => {
       "ACTION_LOG_DOWNLOADED",
       req.user.id,
       null,
-      `Action log downloaded by ${req.user.email}`
+      `Action log downloaded by ${formatActorIdentity(req.user)}`
     );
 
     const filename = `actions-${new Date().toISOString().slice(0, 10)}.log`;
@@ -346,4 +381,25 @@ const downloadActionLogs = async (req, res) => {
   }
 };
 
-module.exports = { generatePDF, generateExcel, getAnalytics, downloadActionLogs };
+const clearActionLogs = async (req, res) => {
+  try {
+    ensureActionLogFile();
+    await fs.promises.writeFile(actionLogPath, "", "utf8");
+
+    const actor = formatActorIdentity(req.user);
+    appendActionLog(`ACTION LOG CLEARED | Cleared by ${actor}`);
+    await logAudit(
+      "ACTION_LOG_CLEARED",
+      req.user.id,
+      null,
+      `Action log cleared by ${actor}`
+    );
+
+    return res.json({ message: "Action logs cleared successfully." });
+  } catch (err) {
+    logError("Action log clear error", err);
+    return res.status(500).json({ message: "Failed to clear action logs." });
+  }
+};
+
+module.exports = { generatePDF, generateExcel, getAnalytics, downloadActionLogs, clearActionLogs };

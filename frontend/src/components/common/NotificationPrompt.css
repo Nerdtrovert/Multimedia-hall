@@ -1,0 +1,68 @@
+.notification-prompt-container {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 88px;
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem 1rem;
+  z-index: 999;
+}
+
+.notification-prompt-card {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, #0f3d2e 0%, #196b4d 100%);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.notification-prompt-copy h3 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+}
+
+.notification-prompt-copy p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.notification-prompt-button {
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: #0f3d2e;
+  font-weight: 700;
+  padding: 0.7rem 1.15rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.notification-prompt-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+@media (max-width: 600px) {
+  .notification-prompt-container {
+    bottom: 76px;
+    padding: 0 0.75rem 0.75rem;
+  }
+
+  .notification-prompt-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .notification-prompt-button {
+    width: 100%;
+  }
+}

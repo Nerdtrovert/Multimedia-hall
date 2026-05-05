@@ -3,6 +3,7 @@
   margin: 0 auto;
   padding: clamp(16px, 3vw, 30px) clamp(12px, 3vw, 24px);
   width: 100%;
+  min-width: 0;
 }
 
 /* ─── Header ───────────────────────────────── */
@@ -91,6 +92,15 @@
 .mini.approved { background: #d1fae5; color: #065f46; }
 .mini.rejected { background: #fee2e2; color: #991b1b; }
 
+.stat-period-label {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ─── Actions ─────────────────────────────── */
 .dashboard-actions {
   display: grid;
@@ -124,6 +134,19 @@
 
 .action-card.primary strong { color: white; }
 .action-card.primary p     { color: rgba(255,255,255,0.7); }
+
+.action-card.danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.action-card.danger strong {
+  color: #b91c1c;
+}
+
+.action-card.danger p {
+  color: #7f1d1d;
+}
 
 .action-icon {
   font-size: 30px;
@@ -168,6 +191,7 @@
   border-radius: 8px;
   padding: 20px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .table-card {
@@ -239,6 +263,17 @@
 .link-btn:hover {
   text-decoration: underline;
 }
+
+.supervisor-tools {
+  margin-bottom: 18px;
+}
+
+.supervisor-tools-note {
+  color: #4b5563;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
 .filter-bar {
   border-radius: 8px;
   margin-bottom: 18px;
@@ -279,6 +314,60 @@
   color: #6b7280;
 }
 
+.confirmation-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.confirmation-modal {
+  width: 440px;
+  max-width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.confirmation-modal h3 {
+  margin: 0 0 10px;
+  color: var(--text-main);
+}
+
+.confirmation-modal p {
+  margin: 0 0 14px;
+  color: #4b5563;
+  overflow-wrap: anywhere;
+}
+
+.confirmation-modal .form-group {
+  margin-bottom: 12px;
+}
+
+.confirmation-modal .form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.confirmation-modal textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 @media (max-width: 768px) {
   .dashboard-page {
     padding: 20px 14px;
@@ -315,6 +404,10 @@
     padding: 14px;
   }
 
+  .bookings-table {
+    min-width: 640px;
+  }
+
   .bookings-table th,
   .bookings-table td {
     padding: 10px;
@@ -322,6 +415,14 @@
 
   .filter-form .btn {
     flex: 1 1 150px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions .btn {
+    width: 100%;
   }
 }
 
@@ -343,5 +444,9 @@
   .filter-form .btn {
     flex-basis: 100%;
     width: 100%;
+  }
+
+  .bookings-table {
+    min-width: 560px;
   }
 }

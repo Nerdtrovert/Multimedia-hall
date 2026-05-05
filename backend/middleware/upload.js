@@ -10,19 +10,6 @@ const posterDir = path.join(uploadsRoot, 'posters');
   }
 });
 
-const createStorage = (folder) =>
-  multer.diskStorage({
-    destination: (req, file, cb) => cb(null, folder),
-    filename: (req, file, cb) => {
-      const safeBaseName = path
-        .basename(file.originalname, path.extname(file.originalname))
-        .replace(/[^a-zA-Z0-9_-]/g, '_')
-        .slice(0, 50);
-      const extension = path.extname(file.originalname).toLowerCase();
-      cb(null, `${Date.now()}-${safeBaseName}${extension}`);
-    },
-  });
-
 const imageMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/jpg']);
 
 const uploadPoster = multer({

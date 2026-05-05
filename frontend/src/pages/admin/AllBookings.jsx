@@ -18,6 +18,10 @@ const AllBookings = () => {
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
+  const [cancelModalBooking, setCancelModalBooking] = useState(null);
+  const [cancelNote, setCancelNote] = useState(
+    'Approved booking cancelled by admin.'
+  );
 
   const [filters, setFilters] = useState({
     college: '',
@@ -66,18 +70,43 @@ const AllBookings = () => {
     setAppliedFilters(cleared);
   };
 
-  const handleAdminCancel = async (booking) => {
-    const note = window.prompt(
-      `Cancel approved booking "${booking.title}"?\nOptional note (shown to user):`,
-      'Approved booking cancelled by admin.'
-    );
+  const toEventEndDate = (booking) => {
+    const datePart = String(booking.event_date || '').split('T')[0];
+    const endPart = String(booking.end_time || '').slice(0, 8);
+    const endDate = new Date(`${datePart}T${endPart}`);
+    return Number.isNaN(endDate.getTime()) ? null : endDate;
+  };
 
-    if (note === null) return;
+  const canCancelApprovedBooking = (booking) => {
+    if (booking.status !== 'approved') return false;
+    const eventEndDate = toEventEndDate(booking);
+    if (!eventEndDate) return false;
+    return eventEndDate > new Date();
+  };
 
-    setCancellingId(booking.id);
+  const openAdminCancelModal = (booking) => {
+    if (!canCancelApprovedBooking(booking)) {
+      toast.error('Completed bookings cannot be cancelled.');
+      return;
+    }
+
+    setCancelModalBooking(booking);
+    setCancelNote('Approved booking cancelled by admin.');
+  };
+
+  const closeAdminCancelModal = () => {
+    if (cancellingId) return;
+    setCancelModalBooking(null);
+  };
+
+  const handleAdminCancel = async () => {
+    if (!cancelModalBooking) return;
+
+    setCancellingId(cancelModalBooking.id);
     try {
-      await updateBookingStatus(booking.id, 'rejected', note);
+      await updateBookingStatus(cancelModalBooking.id, 'rejected', cancelNote);
       toast.success('Approved booking cancelled.');
+      setCancelModalBooking(null);
       await fetchBookings(appliedFilters, false);
     } catch (err) {
       toast.error(
@@ -201,7 +230,7 @@ const AllBookings = () => {
                       </td>
                       <td>{b.title}</td>
                       <td>
-                        {new Date(b.event_date).toLocaleDateString()}
+                        {new Date(b.event_date).toLocaleDateString('en-GB')}
                       </td>
                       <td>
                         {b.start_time} – {b.end_time}
@@ -277,10 +306,10 @@ const AllBookings = () => {
                       </td>
 
                       <td>
-                        {b.status === 'approved' ? (
+                        {canCancelApprovedBooking(b) ? (
                           <button
                             className="btn-secondary"
-                            onClick={() => handleAdminCancel(b)}
+                            onClick={() => openAdminCancelModal(b)}
                             disabled={cancellingId === b.id}
                             style={{ padding: '6px 10px', fontSize: 12 }}
                           >
@@ -288,6 +317,10 @@ const AllBookings = () => {
                               ? 'Cancelling...'
                               : 'Cancel booking'}
                           </button>
+                        ) : b.status === 'approved' ? (
+                          <span style={{ color: '#9ca3af', fontSize: 12 }}>
+                            Event completed
+                          </span>
                         ) : (
                           <span style={{ color: '#9ca3af' }}>—</span>
                         )}
@@ -342,6 +375,46 @@ const AllBookings = () => {
           </div>
         )}
       </div>
+
+      {cancelModalBooking && (
+        <div className="confirmation-modal-overlay" onClick={closeAdminCancelModal}>
+          <div className="confirmation-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Cancel approved booking</h3>
+            <p>
+              <strong>{cancelModalBooking.title}</strong> —{' '}
+              {new Date(cancelModalBooking.event_date).toLocaleDateString('en-GB')}
+            </p>
+            <div className="form-group">
+              <label>Optional note to college</label>
+              <textarea
+                className="input"
+                rows={3}
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                placeholder="Reason for cancellation"
+              />
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={closeAdminCancelModal}
+                disabled={Boolean(cancellingId)}
+              >
+                Keep booking
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleAdminCancel}
+                disabled={Boolean(cancellingId)}
+              >
+                {cancellingId ? 'Cancelling...' : 'Confirm cancellation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

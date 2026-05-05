@@ -11,7 +11,7 @@ const {
   sendBookingStatusPush,
   sendNewBookingRequestPush,
 } = require('../utils/pushNotifications');
-const { logAudit, logError } = require('../utils/audit');
+const { logAudit, logError, formatActorIdentity } = require('../utils/audit');
 
 const uploadsRoot = path.join(__dirname, '..', 'uploads');
 const bookingListSelect = `
@@ -66,6 +66,23 @@ const toTimeMinutes = (timeValue) => {
   }
 
   return hours * 60 + minutes;
+};
+
+const isBookingCompleted = (booking, referenceDate = new Date()) => {
+  const eventDateKey = toDateKey(booking.event_date);
+  const todayKey = toDateKey(referenceDate);
+
+  if (!eventDateKey) return true;
+  if (eventDateKey < todayKey) return true;
+  if (eventDateKey > todayKey) return false;
+
+  const endMinutes = toTimeMinutes(booking.end_time);
+  if (Number.isNaN(endMinutes)) return true;
+
+  const currentMinutes =
+    referenceDate.getHours() * 60 + referenceDate.getMinutes();
+
+  return endMinutes <= currentMinutes;
 };
 
 const toApiPosterUrl = (booking) => {
@@ -127,9 +144,14 @@ const sendNewBookingNotificationsToAdmins = async (booking, requester) => {
   }
 
   const notificationTasks = [];
+  const emailedRecipients = new Set();
   adminRows.forEach((adminUser) => {
     const recipientEmail = normalizeEmail(adminUser.email);
     if (isValidEmail(recipientEmail)) {
+      if (emailedRecipients.has(recipientEmail)) {
+        return;
+      }
+      emailedRecipients.add(recipientEmail);
       notificationTasks.push(
         sendAdminBookingRequestEmail(recipientEmail, adminUser.name, booking, requester)
       );
@@ -261,7 +283,7 @@ const createBooking = async (req, res) => {
       'BOOKING_CREATED',
       user_id,
       result.insertId,
-      `${req.user.email || college_name} requested "${title}" for ${normalizedEventDate}`
+      `${formatActorIdentity(req.user)} requested "${title}" for ${normalizedEventDate}`
     );
 
     setImmediate(() => {
@@ -660,6 +682,33 @@ const updateBookingStatus = async (req, res) => {
     }
 
     const booking = bookingRows[0];
+    const normalizedAdminNote = admin_note || null;
+
+    if (booking.status === status) {
+      await db.query('UPDATE bookings SET admin_note = ? WHERE id = ?', [normalizedAdminNote, id]);
+
+      await logAudit(
+        'BOOKING_STATUS_UPDATED',
+        req.user.id,
+        id,
+        `${formatActorIdentity(req.user)} updated note for already-${status} booking "${booking.title}" requested by ${booking.college_name}`
+      );
+
+      return res.json({
+        message: `Booking already ${status}. Note saved without resending notifications.`,
+        notificationStatus: 'skipped',
+      });
+    }
+
+    if (
+      booking.status === 'approved' &&
+      status === 'rejected' &&
+      isBookingCompleted(booking)
+    ) {
+      return res.status(400).json({
+        message: 'Completed bookings cannot be cancelled.',
+      });
+    }
 
     if (status === 'approved') {
       const [conflicts] = await db.query(
@@ -682,14 +731,14 @@ const updateBookingStatus = async (req, res) => {
 
     await db.query(
       'UPDATE bookings SET status = ?, admin_note = ? WHERE id = ?',
-      [status, admin_note || null, id]
+      [status, normalizedAdminNote, id]
     );
 
     await logAudit(
       'BOOKING_STATUS_UPDATED',
       req.user.id,
       id,
-      `${req.user.email || 'admin'} ${status === 'approved' ? 'accepted' : 'rejected'} "${booking.title}" requested by ${booking.college_name}`
+      `${formatActorIdentity(req.user)} ${status === 'approved' ? 'accepted' : 'rejected'} "${booking.title}" requested by ${booking.college_name}`
     );
 
     res.json({
@@ -698,7 +747,7 @@ const updateBookingStatus = async (req, res) => {
     });
 
     setImmediate(() => {
-      sendBookingDecisionNotifications(booking, status, admin_note).catch((notificationErr) => {
+      sendBookingDecisionNotifications(booking, status, normalizedAdminNote).catch((notificationErr) => {
         console.error(
           `Booking status notifications failed for booking ${id}:`,
           notificationErr.message

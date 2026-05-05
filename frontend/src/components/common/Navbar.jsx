@@ -18,12 +18,14 @@ const Navbar = () => {
     navigate('/login');
   };
 
-  const isAdmin = ['admin', 'supervisor'].includes(user?.role);
-  const base = isAdmin ? '/admin' : '/user';
+  const isAdmin = user?.role === 'admin';
+  const isSupervisor = user?.role === 'supervisor';
+  const isPrivileged = isAdmin || isSupervisor;
+  const base = isAdmin ? '/admin' : isSupervisor ? '/supervisor' : '/user';
   const normalizedName = user?.name?.trim().toLowerCase();
   const normalizedCollegeName = user?.college_name?.trim().toLowerCase();
   const showUserName = Boolean(
-    user?.name && (isAdmin || normalizedName !== normalizedCollegeName)
+    user?.name && (isPrivileged || normalizedName !== normalizedCollegeName)
   );
 
   if (!user) return null;
@@ -91,8 +93,8 @@ const Navbar = () => {
       </div>
       <div className={`navbar-user ${menuOpen ? 'show' : ''}`}>
         <span className="user-info">
-          <span className={`role-badge ${isAdmin ? 'admin' : 'college'}`}>
-            {isAdmin ? (user?.role === 'supervisor' ? 'Supervisor' : 'Admin') : user?.college_name}
+          <span className={`role-badge ${isPrivileged ? 'admin' : 'college'}`}>
+            {isPrivileged ? (isSupervisor ? 'Supervisor' : 'Admin') : user?.college_name}
           </span>
           {showUserName ? user.name : null}
         </span>

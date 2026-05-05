@@ -104,26 +104,28 @@ const UserDashboard = () => {
               No booking requests yet. <Link to="/user/new-booking">Create one →</Link>
             </p>
           ) : (
-            <table className="bookings-table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((b) => (
-                  <tr key={b.id}>
-                    <td>{b.title}</td>
-                    <td>{new Date(b.event_date).toLocaleDateString()}</td>
-                    <td>{b.start_time} – {b.end_time}</td>
-                    <td><StatusBadge status={b.status} /></td>
+            <div className="table-card">
+              <table className="bookings-table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recent.map((b) => (
+                    <tr key={b.id}>
+                      <td>{b.title}</td>
+                      <td>{new Date(b.event_date).toLocaleDateString('en-GB')}</td>
+                      <td>{b.start_time} – {b.end_time}</td>
+                      <td><StatusBadge status={b.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 

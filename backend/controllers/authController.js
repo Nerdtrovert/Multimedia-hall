@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../config/db');
 const { normalizeEmail, isValidEmail, sendPasswordResetEmail } = require('../utils/mailer');
-const { logError } = require('../utils/audit');
+const { appendActionLog, logError, formatActorIdentity } = require('../utils/audit');
 const {
   saveUserPushToken,
   removeUserPushToken,
@@ -47,6 +47,7 @@ const login = async (req, res) => {
 
     const payload = {
       id: user.id,
+      username: user.username,
       email: user.email,
       role: user.role,
       name: user.name,
@@ -72,41 +73,38 @@ const login = async (req, res) => {
 };
 
 const supervisorLogin = async (req, res) => {
-  const { email, password } = req.body;
-  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const password = String(req.body?.password || '').trim();
+  const configuredPassword = String(process.env.SUPERVISOR_PASSWORD || '').trim();
 
-  if (!normalizedEmail || !password) {
-    return res.status(400).json({ message: 'Email and password are required.' });
+  if (!password) {
+    return res.status(400).json({ message: 'Password is required.' });
+  }
+
+  if (!configuredPassword) {
+    return res.status(500).json({ message: 'Supervisor password is not configured.' });
   }
 
   try {
-    const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
+    const [rows] = await db.query("SELECT * FROM users WHERE role = 'supervisor' ORDER BY id ASC LIMIT 1");
 
     if (rows.length === 0) {
       req.auditAction = 'SUPERVISOR_LOGIN_FAILED';
-      req.auditActor = { email: normalizedEmail, role: 'anonymous' };
-      req.auditDetails = 'Supervisor login failed: user not found';
-      return res.status(401).json({ message: 'Invalid credentials.' });
+      req.auditActor = { role: 'anonymous' };
+      req.auditDetails = 'Supervisor login failed: supervisor account not found';
+      return res.status(503).json({ message: 'Supervisor account is unavailable.' });
     }
 
     const user = rows[0];
-    if (user.role !== 'supervisor') {
-      req.auditAction = 'SUPERVISOR_LOGIN_DENIED';
-      req.auditActor = { id: user.id, email: user.email, role: user.role };
-      req.auditDetails = 'Non-supervisor attempted maintenance login';
-      return res.status(403).json({ message: 'Maintenance access denied.' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
+    if (password !== configuredPassword) {
       req.auditAction = 'SUPERVISOR_LOGIN_FAILED';
       req.auditActor = { id: user.id, email: user.email, role: user.role };
-      req.auditDetails = 'Supervisor login failed: invalid password';
+      req.auditDetails = 'Supervisor login failed: invalid env password';
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
     const payload = {
       id: user.id,
+      username: user.username,
       email: user.email,
       role: user.role,
       name: user.name,
@@ -124,7 +122,7 @@ const supervisorLogin = async (req, res) => {
     });
   } catch (err) {
     req.auditAction = 'SUPERVISOR_LOGIN_ERROR';
-    req.auditActor = { email: normalizedEmail, role: 'anonymous' };
+    req.auditActor = { role: 'anonymous' };
     req.auditDetails = 'Supervisor login request failed';
     logError('Supervisor login error', err);
     return res.status(500).json({ message: 'Server error.' });
@@ -134,7 +132,7 @@ const supervisorLogin = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT id, name, email, role, college_name, created_at FROM users WHERE id = ?',
+      'SELECT id, username, name, email, role, college_name, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
     if (rows.length === 0) return res.status(404).json({ message: 'User not found.' });
@@ -197,6 +195,10 @@ const forgotPassword = async (req, res) => {
       console.error('Password reset push failed:', pushErr.message);
     }
 
+    appendActionLog(
+      `PASSWORD RESET | ${recipientEmail} received a temporary password via self-service recovery`
+    );
+
     return res.json({ message: 'If the email exists, a temporary password has been sent.' });
   } catch (err) {
     logError('Forgot password error', err);
@@ -212,6 +214,9 @@ const registerPushToken = async (req, res) => {
 
   try {
     await saveUserPushToken(req.user.id, token, req.headers['user-agent'] || null);
+    appendActionLog(
+      `PUSH TOKEN REGISTERED | ${formatActorIdentity(req.user)} | ${req.headers['user-agent'] || 'unknown device'}`
+    );
     return res.json({ message: 'Push token registered.' });
   } catch (err) {
     logError('Register push token error', err);
@@ -223,6 +228,9 @@ const unregisterPushToken = async (req, res) => {
   const token = String(req.body?.token || '').trim();
   try {
     await removeUserPushToken(req.user.id, token || null);
+    appendActionLog(
+      `PUSH TOKEN REMOVED | ${formatActorIdentity(req.user)} | ${token ? 'single token' : 'all tokens'}`
+    );
     return res.json({ message: 'Push token removed.' });
   } catch (err) {
     logError('Unregister push token error', err);
@@ -268,12 +276,155 @@ const changePassword = async (req, res) => {
   }
 };
 
+const supervisorResetUserEmail = async (req, res) => {
+  const username = String(req.body?.username || '').trim();
+  const updatedEmail = normalizeEmail(req.body?.email);
+
+  if (!username || !updatedEmail) {
+    return res.status(400).json({ message: 'Username and email are required.' });
+  }
+
+  if (!isValidEmail(updatedEmail)) {
+    return res.status(400).json({ message: 'Enter a valid email address.' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      'SELECT id, name, username, email, password, role FROM users WHERE username = ? LIMIT 1',
+      [username]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User not found for the provided username.' });
+    }
+
+    const targetUser = rows[0];
+
+    if (targetUser.role !== 'college') {
+      return res.status(403).json({ message: 'Only college account emails can be changed from this screen.' });
+    }
+
+    const [emailRows] = await db.query(
+      'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
+      [updatedEmail, targetUser.id]
+    );
+
+    if (emailRows.length > 0) {
+      return res.status(409).json({ message: 'This email is already used by another user.' });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    const newPasswordHash = await bcrypt.hash(temporaryPassword, 10);
+
+    await db.query('UPDATE users SET email = ?, password = ? WHERE id = ?', [
+      updatedEmail,
+      newPasswordHash,
+      targetUser.id,
+    ]);
+
+    try {
+      await sendPasswordResetEmail(updatedEmail, targetUser.name, temporaryPassword);
+    } catch (mailErr) {
+      await db.query('UPDATE users SET email = ?, password = ? WHERE id = ?', [
+        targetUser.email,
+        targetUser.password,
+        targetUser.id,
+      ]);
+      throw mailErr;
+    }
+
+    const currentEmail = normalizeEmail(targetUser.email);
+    const emailChanged = currentEmail !== updatedEmail;
+
+    appendActionLog(
+      emailChanged
+        ? `SUPERVISOR EMAIL RESET | ${formatActorIdentity(req.user)} changed ${targetUser.username} email from ${currentEmail} to ${updatedEmail} and issued a temporary password`
+        : `SUPERVISOR PASSWORD REISSUE | ${formatActorIdentity(req.user)} reissued a temporary password for ${targetUser.username} at ${updatedEmail}`
+    );
+
+    return res.json({
+      message: emailChanged
+        ? 'Email updated. A temporary password has been sent to the updated email. Ask the user to change it after first login.'
+        : 'A temporary password has been reissued to the existing email. Ask the user to change it after first login.',
+    });
+  } catch (err) {
+    logError('Supervisor reset user email error', err);
+    return res.status(500).json({ message: 'Unable to update email right now.' });
+  }
+};
+
+const listSupervisorResetUsers = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT username, email
+       FROM users
+       WHERE role NOT IN ('admin', 'supervisor')
+         AND college_name IS NOT NULL
+         AND NULLIF(TRIM(username), '') IS NOT NULL
+       ORDER BY username ASC`
+    );
+    return res.json(rows);
+  } catch (err) {
+    logError('List supervisor reset users error', err);
+    return res.status(500).json({ message: 'Unable to fetch usernames right now.' });
+  }
+};
+
+const supervisorResetOperationalData = async (req, res) => {
+  const confirmation = String(req.body?.confirm || '').trim();
+  if (confirmation !== 'RESET') {
+    return res.status(400).json({
+      message: 'Confirmation failed. Submit { "confirm": "RESET" } to proceed.',
+    });
+  }
+
+  try {
+    const [tableRows] = await db.query(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = DATABASE()
+         AND table_type = 'BASE TABLE'
+         AND table_name <> 'users'`
+    );
+
+    const tableNames = tableRows.map((row) => row.table_name).filter(Boolean);
+
+    if (tableNames.length === 0) {
+      return res.json({ message: 'No non-user tables found to reset.', truncatedTables: [] });
+    }
+
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    try {
+      for (const tableName of tableNames) {
+        await db.query(`TRUNCATE TABLE \`${String(tableName).replace(/`/g, '``')}\``);
+      }
+    } finally {
+      await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    }
+
+    appendActionLog(
+      `SUPERVISOR DATA RESET | ${formatActorIdentity(req.user)} truncated tables (users preserved): ${tableNames.join(', ')}`
+    );
+
+    return res.json({
+      message: 'Database reset complete. All non-user tables were truncated and users were preserved.',
+      truncatedTables: tableNames,
+    });
+  } catch (err) {
+    logError('Supervisor reset operational data error', err);
+    return res.status(500).json({ message: 'Unable to reset operational data right now.' });
+  }
+};
+
 module.exports = {
   login,
   supervisorLogin,
   getMe,
   forgotPassword,
   changePassword,
+  supervisorResetUserEmail,
+  listSupervisorResetUsers,
+  supervisorResetOperationalData,
   registerPushToken,
   unregisterPushToken,
 };

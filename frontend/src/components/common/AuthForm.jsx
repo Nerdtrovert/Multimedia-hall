@@ -6,6 +6,9 @@ const AuthForm = ({
   title,
   subtitle,
   emailPlaceholder = "your@email.com",
+  identifierLabel = "Email",
+  identifierType = "email",
+  showIdentifier = true,
   loading,
   onSubmit,
   form,
@@ -22,16 +25,18 @@ const AuthForm = ({
         </div>
 
         <form onSubmit={onSubmit} className="login-form">
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              placeholder={emailPlaceholder}
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              required
-            />
-          </div>
+          {showIdentifier && (
+            <div className="form-group">
+              <label>{identifierLabel}</label>
+              <input
+                type={identifierType}
+                placeholder={emailPlaceholder}
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
+              />
+            </div>
+          )}
           <div className="form-group">
             <label>Password</label>
             <input

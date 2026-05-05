@@ -1,5 +1,13 @@
 node_modules
 .env
+.env*
+!.env.example
+!**/.env.example
 backend/logs/*.log
+backend/uploads/
+frontend/build/
+frontend/dist/
+*.log
 dist/
 .vscode/
+ReadMe_Admin.md

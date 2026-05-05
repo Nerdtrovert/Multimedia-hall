@@ -28,6 +28,7 @@ const MyBookings = () => {
   const [selectedReportFiles, setSelectedReportFiles] = useState({});
   const [uploadingBookingId, setUploadingBookingId] = useState(null);
   const [cancellingBookingId, setCancellingBookingId] = useState(null);
+  const [cancelModalBooking, setCancelModalBooking] = useState(null);
 
   const fetchBookings = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -82,14 +83,22 @@ const MyBookings = () => {
     }
   };
 
-  const cancelRequest = async (booking) => {
-    const confirmed = window.confirm(`Cancel "${booking.title}"? This cannot be undone.`);
-    if (!confirmed) return;
+  const openCancelModal = (booking) => {
+    setCancelModalBooking(booking);
+  };
 
-    setCancellingBookingId(booking.id);
+  const closeCancelModal = () => {
+    if (cancellingBookingId) return;
+    setCancelModalBooking(null);
+  };
+
+  const cancelRequest = async () => {
+    if (!cancelModalBooking) return;
+    setCancellingBookingId(cancelModalBooking.id);
     try {
-      await cancelBookingRequest(booking.id);
+      await cancelBookingRequest(cancelModalBooking.id);
       toast.success('Booking request cancelled.');
+      setCancelModalBooking(null);
       await fetchBookings(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to cancel booking request.');
@@ -151,7 +160,7 @@ const MyBookings = () => {
                     <td>{i + 1}</td>
 <td><strong>{b.title}</strong></td>
 
-<td>{new Date(b.event_date).toLocaleDateString()}</td>
+<td>{new Date(b.event_date).toLocaleDateString('en-GB')}</td>
 
 <td>{b.start_time} – {b.end_time}</td>
 
@@ -245,7 +254,7 @@ const MyBookings = () => {
     <button
       type="button"
       className="btn-secondary"
-      onClick={() => cancelRequest(b)}
+      onClick={() => openCancelModal(b)}
       disabled={cancellingBookingId === b.id}
       style={{ padding: '6px 10px', fontSize: 12 }}
     >
@@ -262,7 +271,7 @@ const MyBookings = () => {
   {b.admin_note || <span style={{ color: '#9ca3af' }}>—</span>}
 </td>
 
-<td>{new Date(b.created_at).toLocaleDateString()}</td>
+<td>{new Date(b.created_at).toLocaleDateString('en-GB')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -270,6 +279,35 @@ const MyBookings = () => {
           </div>
         )}
       </div>
+
+      {cancelModalBooking && (
+        <div className="confirmation-modal-overlay" onClick={closeCancelModal}>
+          <div className="confirmation-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Cancel booking request</h3>
+            <p>
+              Cancel <strong>{cancelModalBooking.title}</strong>? This cannot be undone.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={closeCancelModal}
+                disabled={Boolean(cancellingBookingId)}
+              >
+                Keep request
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={cancelRequest}
+                disabled={Boolean(cancellingBookingId)}
+              >
+                {cancellingBookingId ? 'Cancelling...' : 'Confirm cancellation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

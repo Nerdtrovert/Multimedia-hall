@@ -6,11 +6,37 @@ import { registerPushToken, unregisterPushToken } from './api';
 const TOKEN_STORAGE_KEY = 'fcm_token';
 let foregroundUnsubscribe = null;
 
+export const isIosDevice = () => {
+  if (typeof window === 'undefined') return false;
+  return /iphone|ipad|ipod/i.test(window.navigator?.userAgent || '');
+};
+
 export const isRunningInstalledApp = () => {
   if (typeof window === 'undefined') return false;
   const isStandaloneMode = window.matchMedia?.('(display-mode: standalone)').matches;
   const isIosStandalone = window.navigator?.standalone === true;
   return Boolean(isStandaloneMode || isIosStandalone);
+};
+
+export const isPushEnvironmentSupported = async () => {
+  if (
+    typeof window === 'undefined' ||
+    !window.isSecureContext ||
+    !('serviceWorker' in navigator) ||
+    !('Notification' in window)
+  ) {
+    return false;
+  }
+
+  return isSupported();
+};
+
+export const getNotificationPermissionState = () => {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'unsupported';
+  }
+
+  return Notification.permission;
 };
 
 const getFirebaseConfig = () => ({
@@ -85,16 +111,9 @@ const setStoredToken = (token, userId = getCurrentAuthUserId()) => {
 };
 
 export const enablePushNotifications = async ({ requestPermission = true, userId = null } = {}) => {
-  if (
-    typeof window === 'undefined' ||
-    !window.isSecureContext ||
-    !('serviceWorker' in navigator) ||
-    !('Notification' in window)
-  ) {
+  if (!(await isPushEnvironmentSupported())) {
     return;
   }
-
-  if (!(await isSupported())) return;
   const app = ensureFirebaseApp();
   if (!app) return;
 

@@ -7,6 +7,8 @@ const {
   sendPostReportReminderEmail,
 } = require('../utils/mailer');
 const { sendPostReportReminderPush } = require('../utils/pushNotifications');
+const { isPushConfigured } = require('../utils/firebaseUtils');
+const { getPrimaryFrontendUrl } = require('../config/env');
 
 const defaultFrontendUrl = 'http://localhost:3000';
 
@@ -45,8 +47,6 @@ const fetchPendingReminderBookings = async () => {
          AND b.event_report_file_path IS NULL
          AND b.event_report_data IS NULL
          AND b.event_date < CURDATE()
-         AND u.email IS NOT NULL
-         AND u.email <> ''
          AND r.id IS NULL
       ORDER BY b.event_date ASC`
   );
@@ -66,39 +66,54 @@ const runPostReportReminderJob = async () => {
     await ensureReminderTable();
     const pendingBookings = await fetchPendingReminderBookings();
     if (pendingBookings.length === 0) return;
+    let deliveredCount = 0;
 
-    const uploadPageUrl = `${process.env.FRONTEND_URL || defaultFrontendUrl}/user/my-bookings`;
+    const uploadPageUrl = `${getPrimaryFrontendUrl() || defaultFrontendUrl}/user/my-bookings`;
 
     for (const booking of pendingBookings) {
       const recipientEmail = normalizeEmail(booking.user_email);
-      if (!isValidEmail(recipientEmail)) {
-        console.warn(`Skipping reminder email for booking ${booking.id}: invalid user email "${booking.user_email || ''}"`);
-        continue;
+      let delivered = false;
+
+      if (hasMailConfig()) {
+        if (!isValidEmail(recipientEmail)) {
+          console.warn(`Skipping reminder email for booking ${booking.id}: invalid user email "${booking.user_email || ''}"`);
+        } else {
+          await sendPostReportReminderEmail(
+            recipientEmail,
+            booking.user_name || booking.college_name,
+            booking,
+            uploadPageUrl
+          );
+          delivered = true;
+        }
       }
 
-      await sendPostReportReminderEmail(
-        recipientEmail,
-        booking.user_name || booking.college_name,
-        booking,
-        uploadPageUrl
-      );
-      try {
-        await sendPostReportReminderPush(booking.user_id, booking);
-      } catch (pushErr) {
-        console.error(`Reminder push failed for booking ${booking.id}:`, pushErr.message);
+      if (isPushConfigured()) {
+        try {
+          const pushResult = await sendPostReportReminderPush(booking.user_id, booking);
+          if ((pushResult?.sent || 0) > 0) {
+            delivered = true;
+          }
+        } catch (pushErr) {
+          console.error(`Reminder push failed for booking ${booking.id}:`, pushErr.message);
+        }
       }
-      await markReminderSent(booking.id, recipientEmail);
+
+      if (delivered) {
+        await markReminderSent(booking.id, recipientEmail || booking.user_email || 'push-only');
+        deliveredCount += 1;
+      }
     }
 
-    console.log(`Post-report reminder job completed. Sent: ${pendingBookings.length}`);
+    console.log(`Post-report reminder job completed. Delivered: ${deliveredCount}/${pendingBookings.length}`);
   } catch (err) {
     console.error('Post-report reminder job failed:', err);
   }
 };
 
 const startPostReportReminderScheduler = () => {
-  if (!hasMailConfig()) {
-    console.warn('Post-report reminders disabled: missing mail configuration.');
+  if (!hasMailConfig() && !isPushConfigured()) {
+    console.warn('Post-report reminders disabled: missing mail and push configuration.');
     return null;
   }
 

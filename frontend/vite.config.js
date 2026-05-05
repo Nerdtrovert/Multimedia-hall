@@ -39,6 +39,33 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+
+          if (id.includes('@fullcalendar')) return 'fullcalendar';
+          if (id.includes('firebase/analytics') || id.includes('@firebase/analytics')) return 'firebase-analytics';
+          if (id.includes('firebase/auth') || id.includes('@firebase/auth')) return 'firebase-auth';
+          if (
+            id.includes('firebase/firestore') ||
+            id.includes('@firebase/firestore') ||
+            id.includes('firebase/database') ||
+            id.includes('@firebase/database') ||
+            id.includes('firebase/storage') ||
+            id.includes('@firebase/storage')
+          ) {
+            return 'firebase-data';
+          }
+          if (id.includes('firebase/app') || id.includes('@firebase/app') || id.includes('firebase')) {
+            return 'firebase-core';
+          }
+          if (id.includes('react') || id.includes('scheduler')) return 'react-vendor';
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     proxy: {

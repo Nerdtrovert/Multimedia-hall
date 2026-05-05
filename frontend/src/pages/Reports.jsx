@@ -38,6 +38,11 @@ const Reports = () => {
   const { user } = useAuth();
   const isAdmin = ["admin", "supervisor"].includes(user?.role);
   const isSupervisor = user?.role === "supervisor";
+  const dashboardFallback = user?.role === "supervisor"
+    ? "/supervisor/dashboard"
+    : user?.role === "admin"
+      ? "/admin/dashboard"
+      : "/user/dashboard";
 
   const [filters, setFilters] = useState({ college: "", from: "", to: "" });
   const [loading, setLoading] = useState({});
@@ -73,7 +78,7 @@ const Reports = () => {
       <Navbar />
       <div className="reports-page">
         <PageBackButton
-          fallback={isAdmin ? "/admin/dashboard" : "/user/dashboard"}
+          fallback={dashboardFallback}
         />
 
         <div className="page-header">

@@ -8,7 +8,11 @@ import './ChangePassword.css';
 
 const ChangePassword = () => {
   const { user } = useAuth();
-  const isAdmin = ['admin', 'supervisor'].includes(user?.role);
+  const dashboardFallback = user?.role === 'supervisor'
+    ? '/supervisor/dashboard'
+    : user?.role === 'admin'
+      ? '/admin/dashboard'
+      : '/user/dashboard';
   const [form, setForm] = useState({
     oldPassword: '',
     newPassword: '',
@@ -40,7 +44,7 @@ const ChangePassword = () => {
     <div>
       <Navbar />
       <div className="change-password-page">
-        <PageBackButton fallback={isAdmin ? '/admin/dashboard' : '/user/dashboard'} />
+        <PageBackButton fallback={dashboardFallback} />
         <div className="change-password-card">
           <h2>Change Password</h2>
           <p>Enter your current password and set a new one.</p>

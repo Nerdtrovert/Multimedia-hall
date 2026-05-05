@@ -7,16 +7,16 @@ import AuthForm from '../components/common/AuthForm';
 const SupervisorLogin = () => {
   const { loginSupervisor } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ password: '' });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const user = await loginSupervisor(form.email, form.password);
+      const user = await loginSupervisor(form.password);
       toast.success(`Maintenance access granted. Welcome, ${user.name}.`);
-      navigate('/admin/dashboard');
+      navigate('/supervisor/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Maintenance login failed.');
     } finally {
@@ -29,7 +29,7 @@ const SupervisorLogin = () => {
       icon="🛠️"
       title="Maintenance Access"
       subtitle="Supervisor emergency login"
-      emailPlaceholder="supervisor@email.com"
+      showIdentifier={false}
       loading={loading}
       onSubmit={handleSubmit}
       form={form}

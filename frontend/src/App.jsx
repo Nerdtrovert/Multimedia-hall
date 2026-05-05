@@ -11,8 +11,6 @@ import { isRunningInstalledApp } from './utils/pushNotifications';
 
 import './App.css';
 
-const isAdminLikeRole = (role) => ['admin', 'supervisor'].includes(role);
-
 /* Lazy pages */
 const Login = lazy(() => import('./pages/Login'));
 const SupervisorLogin = lazy(() => import('./pages/SupervisorLogin'));
@@ -24,6 +22,7 @@ const UserDashboard = lazy(() => import('./pages/user/UserDashboard'));
 const NewBooking = lazy(() => import('./pages/user/NewBooking'));
 const MyBookings = lazy(() => import('./pages/user/MyBookings'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const SupervisorDashboard = lazy(() => import('./pages/supervisor/SupervisorDashboard'));
 const AdminRequests = lazy(() => import('./pages/admin/AdminRequests'));
 const AllBookings = lazy(() => import('./pages/admin/AllBookings'));
 const AboutDevelopers = lazy(() => import('./pages/AboutDevelopers'));
@@ -37,11 +36,14 @@ const HomeRedirect = () => {
 
   if (!user || !isInstalledApp) return <Navigate to="/login" replace />;
 
+  const dashboardPathByRole = user.role === 'supervisor'
+    ? '/supervisor/dashboard'
+    : user.role === 'admin'
+      ? '/admin/dashboard'
+      : '/user/dashboard';
+
   return (
-    <Navigate
-      to={isAdminLikeRole(user.role) ? '/admin/dashboard' : '/user/dashboard'}
-      replace
-    />
+    <Navigate to={dashboardPathByRole} replace />
   );
 };
 
@@ -61,6 +63,8 @@ function App() {
                 } />
                   
                 <Route path="/_maintenance/supervisor-access-portal" element={<SupervisorLogin />} />
+                <Route path="/supervisor-login" element={<SupervisorLogin />} />
+                <Route path="/supervisor-access" element={<SupervisorLogin />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/about" element={<AboutDevelopers />} />
                 <Route path="/" element={<HomeRedirect />} />
@@ -86,22 +90,36 @@ function App() {
 
                 {/* ADMIN */}
                 <Route path="/admin/dashboard" element={
-                  <ProtectedRoute role={['admin', 'supervisor']}><AdminDashboard /></ProtectedRoute>
+                  <ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>
                 } />
                 <Route path="/admin/requests" element={
-                  <ProtectedRoute role={['admin', 'supervisor']}><AdminRequests /></ProtectedRoute>
+                  <ProtectedRoute role="admin"><AdminRequests /></ProtectedRoute>
                 } />
                 <Route path="/admin/all-bookings" element={
-                  <ProtectedRoute role={['admin', 'supervisor']}><AllBookings /></ProtectedRoute>
+                  <ProtectedRoute role="admin"><AllBookings /></ProtectedRoute>
                 } />
                 <Route path="/admin/calendar" element={
-                  <ProtectedRoute role={['admin', 'supervisor']}><CalendarView /></ProtectedRoute>
+                  <ProtectedRoute role="admin"><CalendarView /></ProtectedRoute>
                 } />
                 <Route path="/admin/reports" element={
-                  <ProtectedRoute role={['admin', 'supervisor']}><Reports /></ProtectedRoute>
+                  <ProtectedRoute role="admin"><Reports /></ProtectedRoute>
                 } />
                 <Route path="/admin/change-password" element={
-                  <ProtectedRoute role={['admin', 'supervisor']}><ChangePassword /></ProtectedRoute>
+                  <ProtectedRoute role="admin"><ChangePassword /></ProtectedRoute>
+                } />
+
+                {/* SUPERVISOR */}
+                <Route path="/supervisor/dashboard" element={
+                  <ProtectedRoute role="supervisor"><SupervisorDashboard /></ProtectedRoute>
+                } />
+                <Route path="/supervisor/calendar" element={
+                  <ProtectedRoute role="supervisor"><CalendarView /></ProtectedRoute>
+                } />
+                <Route path="/supervisor/reports" element={
+                  <ProtectedRoute role="supervisor"><Reports /></ProtectedRoute>
+                } />
+                <Route path="/supervisor/change-password" element={
+                  <ProtectedRoute role="supervisor"><ChangePassword /></ProtectedRoute>
                 } />
 
                 {/* Fallback */}

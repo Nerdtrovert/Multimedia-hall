@@ -120,7 +120,7 @@ const sendAdminBookingRequestEmail = async (toEmail, adminName, booking, request
         <h1 style="color: white; margin: 0;">Auditorium Booking System</h1>
       </div>
       <div style="padding: 30px; background: #f9fafb; border: 1px solid #e5e7eb;">
-        <p>Dear <strong>${adminName || 'Admin'}</strong>,</p>
+        <p>Dear <strong>${adminName || 'NES Admin'}</strong>,</p>
         <p>A new auditorium booking request is waiting for review.</p>
 
         <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #1e3a5f;">
