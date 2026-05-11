@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+const { getPrimaryFrontendUrl } = require('../config/env');
 
 let transporter = null;
 let transportVerified = false;
@@ -9,6 +10,35 @@ let transportVerified = false;
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
+
+const trimTrailingSlash = (value) => String(value || '').trim().replace(/\/+$/, '');
+
+const isAbsoluteUrl = (value) => /^[a-z][a-z\d+\-.]*:\/\//i.test(String(value || '').trim());
+
+const joinUrl = (baseUrl, route = '') => {
+  const normalizedBase = trimTrailingSlash(baseUrl);
+  if (!normalizedBase) return '';
+  if (!route) return normalizedBase;
+  return `${normalizedBase}${route.startsWith('/') ? route : `/${route}`}`;
+};
+
+const getMailUrl = (envValue, fallbackRoute) => {
+  const overrideUrl = trimTrailingSlash(envValue);
+  if (overrideUrl) return overrideUrl;
+  if (isAbsoluteUrl(fallbackRoute)) return String(fallbackRoute).trim();
+  return joinUrl(getPrimaryFrontendUrl(), fallbackRoute);
+};
+
+const renderButton = (href, label) => {
+  if (!href) return '';
+  return `
+    <p style="margin: 24px 0 0;">
+      <a href="${href}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #1e3a5f; color: #ffffff; text-decoration: none; padding: 10px 16px; border-radius: 6px; font-weight: 600;">
+        ${label}
+      </a>
+    </p>
+  `;
+};
 
 const hasMailConfig = () =>
   Boolean(
@@ -100,6 +130,7 @@ const sendStatusEmail = async (toEmail, userName, booking, status, adminNote) =>
         </div>
 
         ${!isApproved ? '<p>You may submit a new request for a different time slot.</p>' : '<p>Please ensure the auditorium is left in good condition after your event.</p><p>After the event ends, upload your post-event report from the <strong>My Bookings</strong> page.</p>'}
+        ${renderButton(getMailUrl(process.env.MAIL_DASHBOARD_URL, '/user/dashboard'), 'Open Dashboard')}
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">This is an automated message. Do not reply.</p>
       </div>
     </div>
@@ -135,6 +166,10 @@ const sendAdminBookingRequestEmail = async (toEmail, adminName, booking, request
         </div>
 
         <p>Please open the admin requests page to approve or reject this request.</p>
+        ${renderButton(
+          getMailUrl(process.env.MAIL_ADMIN_URL, '/admin/requests'),
+          'Open Admin Requests'
+        )}
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">This is an automated message. Do not reply.</p>
       </div>
     </div>
@@ -167,12 +202,11 @@ const sendPostReportReminderEmail = async (toEmail, userName, booking, uploadPag
           </table>
         </div>
 
-        <p>Please upload your report from the My Bookings page:</p>
-        <p>
-          <a href="${uploadPageUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #1e3a5f; color: #ffffff; text-decoration: none; padding: 10px 14px; border-radius: 6px; font-weight: 600;">
-            Open My Bookings
-          </a>
-        </p>
+        <p>Please upload your report from the 'My Bookings' menu:</p>
+        ${renderButton(
+          getMailUrl(process.env.MAIL_BOOKINGS_URL, uploadPageUrl || '/user/my-bookings'),
+          'Open My Bookings'
+        )}
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">This is an automated reminder. Do not reply.</p>
       </div>
     </div>
@@ -201,7 +235,8 @@ const sendPasswordResetEmail = async (toEmail, userName, temporaryPassword) => {
           <p style="margin: 8px 0 0; font-size: 20px; font-weight: 700; letter-spacing: 1px;">${temporaryPassword}</p>
         </div>
 
-        <p>After login, please change your password from the Change Password option in the navbar.</p>
+        <p>After login,<strong> PLEASE change your password </strong>from the Change Password option in the menu.</p>
+        ${renderButton(getMailUrl(process.env.MAIL_LOGIN_URL, '/login'), 'Go to Login')}
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">This is an automated message. Do not reply.</p>
       </div>
     </div>
@@ -219,6 +254,7 @@ module.exports = {
   hasMailConfig,
   isValidEmail,
   normalizeEmail,
+  getMailUrl,
   sendStatusEmail,
   sendAdminBookingRequestEmail,
   sendPostReportReminderEmail,

@@ -143,8 +143,10 @@ const generatePDF = async (req, res) => {
       size: 'A4'
     });
 
+    const exportDate = new Date().toISOString().slice(0,10);
+    const filename = `bookings_report_${exportDate}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "attachment; filename=bookings_report.pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     doc.pipe(res);
 
     // Header
@@ -397,13 +399,15 @@ const generateExcel = async (req, res) => {
       }
     });
 
+    const exportDate = new Date().toISOString().slice(0,10);
+    const filename = `bookings_report_${exportDate}.xlsx`;
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader(
       "Content-Disposition",
-      "attachment; filename=bookings_report.xlsx",
+      `attachment; filename="${filename}"`,
     );
     await workbook.xlsx.write(res);
     res.end();

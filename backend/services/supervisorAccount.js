@@ -2,21 +2,19 @@ const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 
 const getSupervisorConfig = () => {
-  const name = String(process.env.SUPERVISOR_NAME || '').trim();
-  const email = String(process.env.SUPERVISOR_EMAIL || '').trim().toLowerCase();
   const password = String(process.env.SUPERVISOR_PASSWORD || '').trim();
 
-  if (!name || !email || !password) {
+  if (!password) {
     return null;
   }
 
-  return { name, email, password };
+  return { password };
 };
 
 const ensureSupervisorAccount = async () => {
   const supervisor = getSupervisorConfig();
   if (!supervisor) {
-    throw new Error('Supervisor account sync failed: SUPERVISOR_NAME, SUPERVISOR_EMAIL, and SUPERVISOR_PASSWORD are required.');
+    throw new Error('Supervisor account sync failed: SUPERVISOR_PASSWORD is required.');
   }
 
   await db.query(
@@ -43,16 +41,14 @@ const ensureSupervisorAccount = async () => {
     `INSERT INTO users (username, name, email, password, role, college_name)
      VALUES (?, ?, ?, ?, 'supervisor', NULL)
      ON DUPLICATE KEY UPDATE
-        username = COALESCE(NULLIF(username, ''), VALUES(username)),
-        name = VALUES(name),
-        email = VALUES(email),
         password = VALUES(password),
-        role = VALUES(role),
-        college_name = VALUES(college_name)`,
-     ['system-supervisor', supervisor.name, supervisor.email, passwordHash]
-   );
+        role = VALUES(role)`,
+    ['system-supervisor', '', '', passwordHash]
+  );
 };
+
 
 module.exports = {
   ensureSupervisorAccount,
 };
+

@@ -204,6 +204,12 @@
   color: var(--primary-dark);
 }
 
+.password-toggle svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 .password-toggle:focus-visible {
   outline: 2px solid rgba(30, 27, 75, 0.3); /* Navy focus */
   outline-offset: 2px;

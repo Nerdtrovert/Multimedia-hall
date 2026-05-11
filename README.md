@@ -150,6 +150,7 @@ audit_logs
 
 - Set `JWT_SECRET` explicitly in production. The backend will not boot without it.
 - `FRONTEND_URL` supports a single origin or a comma-separated allowlist.
+- Mail buttons can be customized with `MAIL_LOGIN_URL`, `MAIL_DASHBOARD_URL`, `MAIL_ADMIN_URL`, and `MAIL_BOOKINGS_URL`; each falls back to `FRONTEND_URL` if unset.
 - Poster and report links in exports use API routes now, so they continue to work for database-backed files.
 - New uploads are stored in MySQL; `backend/uploads/` remains only as a backward-compatible fallback for older rows.
 
