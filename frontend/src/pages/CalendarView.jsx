@@ -15,12 +15,12 @@ import './Calendar.css';
    COLLEGE COLORS
 ================================ */
 const COLLEGE_COLORS = {
-  'College A': '#2563eb',
-  'College B': '#f97316',
-  'College C': '#22c55e',
+  'College A': '#1e1b4b', // Navy
+  'College B': '#ea580c', // Orange
+  'College C': '#f97316', // Orange light
 };
 
-const DEFAULT_COLOR = '#6366f1';
+const DEFAULT_COLOR = '#1e1b4b';
 
 /* ===============================
    HELPERS

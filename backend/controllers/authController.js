@@ -155,6 +155,8 @@ const generateTemporaryPassword = () => {
   return password;
 };
 
+const configuredAdminUsername = String(process.env.SEED_ADMIN_USERNAME || 'nes-admin').trim() || 'nes-admin';
+
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
   const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -300,8 +302,12 @@ const supervisorResetUserEmail = async (req, res) => {
 
     const targetUser = rows[0];
 
-    if (targetUser.role !== 'college') {
-      return res.status(403).json({ message: 'Only college account emails can be changed from this screen.' });
+    const canResetEmail =
+      targetUser.role === 'college' ||
+      (targetUser.role === 'admin' && targetUser.username === configuredAdminUsername);
+
+    if (!canResetEmail) {
+      return res.status(403).json({ message: 'Only college accounts and the NES admin can be changed from this screen.' });
     }
 
     const [emailRows] = await db.query(
@@ -355,15 +361,30 @@ const supervisorResetUserEmail = async (req, res) => {
 
 const listSupervisorResetUsers = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT username, email
+    const [collegeRows] = await db.query(
+      `SELECT username, email, role, NULL AS label
        FROM users
        WHERE role NOT IN ('admin', 'supervisor')
          AND college_name IS NOT NULL
          AND NULLIF(TRIM(username), '') IS NOT NULL
        ORDER BY username ASC`
     );
-    return res.json(rows);
+
+    const [adminRows] = await db.query(
+      `SELECT username, email, role, 'NES Admin' AS label
+       FROM users
+       WHERE username = ?
+       LIMIT 1`,
+      [configuredAdminUsername]
+    );
+
+    const [countRows] = await db.query('SELECT COUNT(*) AS totalUsers FROM users');
+    const totalUsers = Number(countRows[0]?.totalUsers || 0);
+
+    return res.json({
+      users: [...adminRows, ...collegeRows],
+      totalUsers,
+    });
   } catch (err) {
     logError('List supervisor reset users error', err);
     return res.status(500).json({ message: 'Unable to fetch usernames right now.' });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
+  getAllBookings,
   getPendingBookings,
   getAnalytics,
   downloadActionLogs,
@@ -12,14 +13,17 @@ import {
 } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/common/Navbar';
+import RecentActivitySection from '../../components/common/RecentActivitySection';
 import StatusBadge from '../../components/common/StatusBadge';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
+import { getRecentApprovedBookings } from '../../utils/recentActivity';
 import '../Dashboard.css';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
   const isSupervisor = user?.role === 'supervisor';
   const [pending, setPending] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloadingLogs, setDownloadingLogs] = useState(false);
@@ -30,15 +34,21 @@ const AdminDashboard = () => {
   const [updatingEmail, setUpdatingEmail] = useState(false);
 
   const fetchDashboardData = useCallback(async (showLoader = true) => {
-    if (isSupervisor) {
-      if (showLoader) setLoading(false);
-      return;
-    }
     if (showLoader) setLoading(true);
     try {
-      const [pendingRes, analyticsRes] = await Promise.all([getPendingBookings(), getAnalytics()]);
-      setPending(pendingRes.data);
-      setAnalytics(analyticsRes.data);
+      if (isSupervisor) {
+        const bookingsRes = await getAllBookings();
+        setBookings(bookingsRes.data?.data || []);
+      } else {
+        const [pendingRes, analyticsRes, bookingsRes] = await Promise.all([
+          getPendingBookings(),
+          getAnalytics(),
+          getAllBookings(),
+        ]);
+        setPending(pendingRes.data);
+        setAnalytics(analyticsRes.data);
+        setBookings(bookingsRes.data?.data || []);
+      }
     } finally {
       if (showLoader) setLoading(false);
     }
@@ -162,6 +172,8 @@ const AdminDashboard = () => {
     }
   };
 
+  const recentActivity = getRecentApprovedBookings(bookings);
+
   return (
     <div>
       <Navbar />
@@ -174,12 +186,21 @@ const AdminDashboard = () => {
         {!isSupervisor && analytics && (
           <div className="stats-row">
             {analytics.totalByCollege.map((c) => (
-              <div key={c.college_name} className="stat-card college-stat">
+              <div key={c.college_name} className="stat-card college-stat college-summary-card">
                 <div className="stat-college-name">{c.college_name}</div>
-                <div className="stat-mini-row">
-                  <span className="mini pending">{c.pending} pending</span>
-                  <span className="mini approved">{c.approved} approved this month</span>
-                  <span className="mini rejected">{c.rejected} rejected this month</span>
+                <div className="college-summary-grid">
+                  <div className="college-summary-metric pending">
+                    <div className="college-summary-value">{c.pending}</div>
+                    <div className="college-summary-label">Pending Active</div>
+                  </div>
+                  <div className="college-summary-metric approved">
+                    <div className="college-summary-value">{c.approved}</div>
+                    <div className="college-summary-label">Approved This Month</div>
+                  </div>
+                  <div className="college-summary-metric rejected">
+                    <div className="college-summary-value">{c.rejected}</div>
+                    <div className="college-summary-label">Rejected This Month</div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -255,6 +276,14 @@ const AdminDashboard = () => {
         </div>
 
         {isSupervisor && (
+          <RecentActivitySection
+            bookings={recentActivity}
+            loading={loading}
+            emptyMessage="No recent approved activity right now."
+          />
+        )}
+
+        {isSupervisor && (
         <section className="recent-section supervisor-tools">
             <h3>Supervisor User Email Reset</h3>
             <p className="supervisor-tools-note">
@@ -296,6 +325,14 @@ const AdminDashboard = () => {
               </button>
             </form>
           </section>
+        )}
+
+        {!isSupervisor && (
+          <RecentActivitySection
+            bookings={recentActivity}
+            loading={loading}
+            emptyMessage="No recent approved activity right now."
+          />
         )}
 
         {!isSupervisor && (

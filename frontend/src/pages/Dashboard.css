@@ -63,17 +63,127 @@
   color: #6b7280;
 }
 
+.user-stat-card {
+  border-radius: 16px;
+  padding: 24px 18px;
+  border: 1px solid transparent;
+}
+
+.user-stat-card .stat-number {
+  margin-bottom: 10px;
+  line-height: 1;
+}
+
+.user-stat-card .stat-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.user-stat-card.total {
+  background: linear-gradient(135deg, #1e2a78 0%, #16215f 100%);
+  border-color: #1d2d7a;
+}
+
+.user-stat-card.total .stat-number,
+.user-stat-card.total .stat-label {
+  color: #ffffff;
+}
+
+.user-stat-card.pending {
+  background: linear-gradient(180deg, #fff7d6 0%, #fef3c7 100%);
+  border-color: #fde68a;
+}
+
+.user-stat-card.pending .stat-label {
+  color: #92400e;
+}
+
+.user-stat-card.approved {
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+  border-color: #a7f3d0;
+}
+
+.user-stat-card.approved .stat-label {
+  color: #065f46;
+}
+
+.user-stat-card.rejected {
+  background: linear-gradient(180deg, #fff1f2 0%, #fee2e2 100%);
+  border-color: #fecaca;
+}
+
+.user-stat-card.rejected .stat-label {
+  color: #991b1b;
+}
+
 /* ─── College Stats ───────────────────────── */
 .college-stat {
   text-align: left;
+}
+
+.college-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .stat-college-name {
   font-size: 15px;
   font-weight: 700;
   color: #1e3a5f;
-  margin-bottom: 8px;
   overflow-wrap: anywhere;
+}
+
+.college-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.college-summary-metric {
+  border-radius: 14px;
+  padding: 16px 12px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px solid transparent;
+}
+
+.college-summary-metric.pending {
+  background: linear-gradient(180deg, #fff7d6 0%, #fef3c7 100%);
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.college-summary-metric.approved {
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.college-summary-metric.rejected {
+  background: linear-gradient(180deg, #fff1f2 0%, #fee2e2 100%);
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.college-summary-value {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.college-summary-label {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .stat-mini-row {
@@ -190,6 +300,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 20px;
+  margin-bottom: 18px;
   min-width: 0;
   overflow: hidden;
 }
@@ -217,13 +328,28 @@
 .bookings-table th {
   background: #f3f4f6;
   color: #6b7280;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 700;
+  vertical-align: middle;
 }
 
 .bookings-table td {
-  padding: 12px;
+  padding: 14px 16px;
   border-bottom: 1px solid #f3f4f6;
   color: #374151;
-  vertical-align: top;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.bookings-table th:last-child,
+.bookings-table td:last-child {
+  text-align: center;
+}
+
+.bookings-table td strong {
+  display: inline-block;
+  line-height: 1.3;
 }
 
 .table-poster-thumb {
@@ -386,6 +512,18 @@
     font-size: 28px;
   }
 
+  .college-summary-grid {
+    gap: 10px;
+  }
+
+  .college-summary-metric {
+    padding: 14px 10px;
+  }
+
+  .college-summary-value {
+    font-size: 28px;
+  }
+
   .dashboard-actions {
     grid-template-columns: 1fr;
     margin-bottom: 24px;
@@ -402,6 +540,7 @@
 
   .recent-section {
     padding: 14px;
+    margin-bottom: 14px;
   }
 
   .bookings-table {
@@ -410,7 +549,7 @@
 
   .bookings-table th,
   .bookings-table td {
-    padding: 10px;
+    padding: 10px 12px;
   }
 
   .filter-form .btn {
@@ -432,6 +571,10 @@
   }
 
   .stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .college-summary-grid {
     grid-template-columns: 1fr;
   }
 

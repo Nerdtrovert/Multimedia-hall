@@ -529,9 +529,8 @@ const getEventReport = async (req, res) => {
 
     const isOwner = req.user.id === booking.user_id;
     const isAdmin = ['admin', 'supervisor'].includes(req.user.role);
-    const isApproved = booking.status === 'approved';
 
-    if (!isAdmin && !isOwner && !isApproved) {
+    if (!isAdmin && !isOwner) {
       return res.status(403).json({ message: 'You are not authorized to access this report.' });
     }
 

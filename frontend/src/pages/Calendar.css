@@ -41,12 +41,12 @@
 /* College Colors (LEGEND SUPPORT) */
 .legend-dot.college-a,
 .event-college-a {
-  background: #2563eb; /* Blue */
+  background: var(--primary); /* Navy */
 }
 
 .legend-dot.college-b,
 .event-college-b {
-  background: #f97316; /* Orange */
+  background: var(--accent); /* Orange */
 }
 
 .legend-dot.college-c,

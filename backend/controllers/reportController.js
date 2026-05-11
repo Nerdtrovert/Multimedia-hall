@@ -19,6 +19,7 @@ async function fetchBookingsForReport(filters, userId = null) {
   let query = `
     SELECT b.id, b.college_name, b.title, b.purpose,
            DATE_FORMAT(b.event_date, '%d/%m/%Y') AS event_date,
+           DATE_FORMAT(b.event_date, '%Y-%m-%d') AS event_date_raw,
            b.start_time, b.end_time, b.status, b.admin_note, b.created_at,
            b.poster_file_path, b.event_report_file_path,
            CASE
@@ -55,10 +56,70 @@ async function fetchBookingsForReport(filters, userId = null) {
     params.push(toDate);
   }
 
-  query += " ORDER BY b.event_date DESC";
+  query += " ORDER BY b.event_date";
   const [rows] = await db.query(query, params);
   return rows;
 }
+
+const toTimeMinutes = (timeValue) => {
+  const [hours, minutes] = String(timeValue || "")
+    .split(":")
+    .map((part) => Number.parseInt(part, 10));
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return Number.NaN;
+  }
+
+  return hours * 60 + minutes;
+};
+
+const hasEventEnded = (booking, referenceDate = new Date()) => {
+  const eventDate = String(booking.event_date_raw || "").split("T")[0];
+  if (!eventDate) return false;
+
+  const today = [
+    referenceDate.getFullYear(),
+    `${referenceDate.getMonth() + 1}`.padStart(2, "0"),
+    `${referenceDate.getDate()}`.padStart(2, "0"),
+  ].join("-");
+
+  if (eventDate < today) return true;
+  if (eventDate > today) return false;
+
+  const endMinutes = toTimeMinutes(booking.end_time);
+  if (Number.isNaN(endMinutes)) return false;
+
+  const currentMinutes =
+    referenceDate.getHours() * 60 + referenceDate.getMinutes();
+
+  return endMinutes <= currentMinutes;
+};
+
+const toReportStatus = (booking) => {
+  const normalizedStatus = String(booking.status || "").toLowerCase();
+  if (normalizedStatus === "approved" && hasEventEnded(booking)) {
+    return "EVENT ENDED";
+  }
+  return normalizedStatus.toUpperCase() || "—";
+};
+
+const isValidDateInput = (value) =>
+  !value || /^\d{4}-\d{2}-\d{2}$/.test(String(value).split("T")[0]);
+
+const validateReportFilters = (filters) => {
+  const fromDate = String(filters.from || "").split("T")[0];
+  const toDate = String(filters.to || "").split("T")[0];
+
+  if (!isValidDateInput(fromDate) || !isValidDateInput(toDate)) {
+    return "Invalid report date filter.";
+  }
+
+  if (fromDate && toDate && fromDate > toDate) {
+    return "From date cannot be after To date.";
+  }
+
+  return null;
+};
 
 // ─── Generate PDF report ──────────────────────────────────────────────────────
 // ─── Generate PDF report ──────────────────────────────────────────────────────
@@ -66,6 +127,11 @@ const generatePDF = async (req, res) => {
   const isAdmin = ["admin", "supervisor"].includes(req.user.role);
   const filters = req.query;
   const userId = isAdmin ? null : req.user.id;
+  const filterError = validateReportFilters(filters);
+
+  if (filterError) {
+    return res.status(400).json({ message: filterError });
+  }
 
   try {
     const bookings = await fetchBookingsForReport(filters, userId);
@@ -101,13 +167,13 @@ const generatePDF = async (req, res) => {
     // Fluid Column Widths
     const colWidths = [
       35,   // Sl no
-      85,   // College
+      130,  // College
       0,    // Title     → will be calculated (flexible)
       0,    // Purpose   → will be calculated (flexible)
       68,   // Date
       62,   // Start Time
       62,   // End Time
-      65,   // Status
+      86,   // Status
       78,   // Poster Link
       105   // Report Link
     ];
@@ -123,11 +189,34 @@ const generatePDF = async (req, res) => {
     const totalTableWidth = colWidths.reduce((a, b) => a + b, 0);
     const TABLE_LEFT = leftMargin + Math.floor((availableWidth - totalTableWidth) / 2); // Center table
 
-    const ROW_HEIGHT = 22;
     const TABLE_RIGHT = TABLE_LEFT + totalTableWidth;
+    const CELL_X_PADDING = 4;
+    const CELL_Y_PADDING = 5;
+    const MIN_ROW_HEIGHT = 24;
+
+    const getRowHeight = (cols, isHeader = false) => {
+      const fontSize = isHeader ? 9 : 8;
+      const font = isHeader ? "Helvetica-Bold" : "Helvetica";
+      doc.font(font).fontSize(fontSize);
+
+      const heights = cols.map((col, index) => {
+        const textStr =
+          typeof col === "object" && col !== null ? col.text || "—" : String(col ?? "—");
+        return doc.heightOfString(textStr, {
+          width: colWidths[index] - CELL_X_PADDING * 2,
+          align: "left",
+          lineBreak: true,
+        });
+      });
+
+      return Math.max(
+        MIN_ROW_HEIGHT,
+        Math.ceil(Math.max(...heights) + CELL_Y_PADDING * 2)
+      );
+    };
 
     // ── Helper: Draw Row ─────────────────────────────────────────────────────
-    const drawRow = (cols, y, isHeader = false) => {
+    const drawRow = (cols, y, rowHeight, isHeader = false) => {
       let x = TABLE_LEFT;
       const fontSize = isHeader ? 9 : 8;
       const font = isHeader ? "Helvetica-Bold" : "Helvetica";
@@ -144,9 +233,9 @@ const generatePDF = async (req, res) => {
         }
 
         const textOpts = {
-          width: colWidths[i] - 8,
+          width: colWidths[i] - CELL_X_PADDING * 2,
           align: "left",
-          lineBreak: true,           // Allow wrapping for long text
+          lineBreak: true,
         };
 
         if (linkUrl && !isHeader) {
@@ -157,24 +246,24 @@ const generatePDF = async (req, res) => {
           doc.fillColor(isHeader ? "white" : "#111827");
         }
 
-        doc.text(textStr, x + 4, y + 5, textOpts);
+        doc.text(textStr, x + CELL_X_PADDING, y + CELL_Y_PADDING, textOpts);
         x += colWidths[i];
       });
     };
 
     // ── Helper: Draw Row Background + Border ────────────────────────────────
-    const drawRowBg = (y, isHeader = false, isEven = false) => {
+    const drawRowBg = (y, rowHeight, isHeader = false, isEven = false) => {
       const width = TABLE_RIGHT - TABLE_LEFT;
 
       if (isHeader) {
-        doc.rect(TABLE_LEFT, y, width, ROW_HEIGHT).fill("#1e3a5f");
+        doc.rect(TABLE_LEFT, y, width, rowHeight).fill("#1e3a5f");
       } else if (isEven) {
-        doc.rect(TABLE_LEFT, y, width, ROW_HEIGHT).fill("#f8fafc");
+        doc.rect(TABLE_LEFT, y, width, rowHeight).fill("#f8fafc");
       }
 
       // Bottom border
-      doc.moveTo(TABLE_LEFT, y + ROW_HEIGHT)
-         .lineTo(TABLE_RIGHT, y + ROW_HEIGHT)
+      doc.moveTo(TABLE_LEFT, y + rowHeight)
+         .lineTo(TABLE_RIGHT, y + rowHeight)
          .strokeColor("#d1d5db")
          .lineWidth(0.6)
          .stroke();
@@ -184,24 +273,13 @@ const generatePDF = async (req, res) => {
     let currentY = doc.y;
 
     // Header Row
-    drawRowBg(currentY, true);
-    drawRow(headers, currentY, true);
-    currentY += ROW_HEIGHT;
+    const headerHeight = getRowHeight(headers, true);
+    drawRowBg(currentY, headerHeight, true);
+    drawRow(headers, currentY, headerHeight, true);
+    currentY += headerHeight;
 
     // Data Rows
     bookings.forEach((b, idx) => {
-      if (currentY + ROW_HEIGHT > 550) {
-        doc.addPage();
-        currentY = 50;
-
-        drawRowBg(currentY, true);
-        drawRow(headers, currentY, true);
-        currentY += ROW_HEIGHT;
-      }
-
-      const isEven = idx % 2 === 0;
-      drawRowBg(currentY, false, isEven);
-
       const posterUrl = Number(b.has_poster || 0) > 0
         ? `${apiBaseUrl}/api/bookings/${b.id}/poster`
         : null;
@@ -218,13 +296,26 @@ const generatePDF = async (req, res) => {
         b.event_date,
         b.start_time || "—",
         b.end_time || "—",
-        b.status?.toUpperCase() || "—",
+        toReportStatus(b),
         posterUrl ? { text: "View Poster", link: posterUrl } : "—",
         reportUrl ? { text: "View Report", link: reportUrl } : "—",
       ];
 
-      drawRow(cols, currentY);
-      currentY += ROW_HEIGHT;
+      const rowHeight = getRowHeight(cols);
+
+      if (currentY + rowHeight > 550) {
+        doc.addPage();
+        currentY = 50;
+
+        drawRowBg(currentY, headerHeight, true);
+        drawRow(headers, currentY, headerHeight, true);
+        currentY += headerHeight;
+      }
+
+      const isEven = idx % 2 === 0;
+      drawRowBg(currentY, rowHeight, false, isEven);
+      drawRow(cols, currentY, rowHeight);
+      currentY += rowHeight;
     });
 
     doc.end();
@@ -241,6 +332,11 @@ const generateExcel = async (req, res) => {
   const isAdmin = ["admin", "supervisor"].includes(req.user.role);
   const filters = req.query;
   const userId = isAdmin ? null : req.user.id;
+  const filterError = validateReportFilters(filters);
+
+  if (filterError) {
+    return res.status(400).json({ message: filterError });
+  }
 
   try {
     const bookings = await fetchBookingsForReport(filters, userId);
@@ -279,7 +375,7 @@ const generateExcel = async (req, res) => {
         event_date: b.event_date,
         start_time: b.start_time,
         end_time: b.end_time,
-        status: b.status?.toUpperCase() || "—",
+        status: toReportStatus(b),
       });
 
       if (Number(b.has_poster || 0) > 0) {
@@ -325,7 +421,13 @@ const getAnalytics = async (req, res) => {
   try {
     const [totalByCollege] = await db.query(
       `SELECT college_name, COUNT(*) as total,
-              SUM(status='pending') as pending,
+              SUM(
+                CASE
+                  WHEN status = 'pending'
+                  THEN 1
+                  ELSE 0
+                END
+              ) as pending,
               SUM(
                 CASE
                   WHEN status = 'approved'
@@ -350,7 +452,7 @@ const getAnalytics = async (req, res) => {
     const [monthlyTrend] = await db.query(
       `SELECT DATE_FORMAT(event_date, '%Y-%m') as month, COUNT(*) as count
        FROM bookings WHERE status='approved'
-       GROUP BY month ORDER BY month DESC LIMIT 12`,
+       GROUP BY month ORDER BY month LIMIT 12`,
     );
 
     res.json({ totalByCollege, monthlyTrend });

@@ -8,18 +8,18 @@
    DESIGN TOKENS
 ================================ */
 :root {
-  --primary: #2563eb;
-  --primary-dark: #1e40af;
+  --primary: #1e1b4b;
+  --primary-light: #2d2a6e;
+  --primary-dark: #1e1b4b;
 
-  --accent: #f97316;
-  --accent-dark: #ea580c;
+  --accent: #ea580c;
+  --accent-light: #f97316;
+  --accent-dark: #c2410c;
 
-  --primary-light: #93c5fd;
-
-  --bg: #f8fafc;
+  --bg: #f4f4f8;
   --card-bg: #ffffff;
 
-  --text-main: #1f2937;
+  --text-main: #1e1b4b;
   --text-light: #6b7280;
 
   --border: #e5e7eb;
@@ -174,7 +174,7 @@ button:disabled {
 }
 
 .btn-primary:hover {
-  background: var(--primary-dark);
+  background: var(--primary-light);
 }
 
 .btn-accent {
@@ -183,7 +183,7 @@ button:disabled {
 }
 
 .btn-accent:hover {
-  background: var(--accent-dark);
+  background: var(--accent-light);
 }
 
 .btn-outline {
@@ -221,7 +221,7 @@ button:disabled {
 
 .input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+  box-shadow: 0 0 0 3px rgba(30, 27, 75, 0.1);
 }
 
 /* ===============================

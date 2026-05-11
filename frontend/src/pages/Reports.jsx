@@ -34,6 +34,28 @@ const activeFilters = (filters) =>
     Object.entries(filters).filter(([, v]) => String(v).trim()),
   );
 
+const extractDownloadErrorMessage = async (error, fallbackMessage) => {
+  const responseData = error?.response?.data;
+
+  if (responseData instanceof Blob) {
+    try {
+      const rawText = await responseData.text();
+      if (!rawText) return fallbackMessage;
+
+      try {
+        const parsed = JSON.parse(rawText);
+        return parsed?.message || fallbackMessage;
+      } catch {
+        return rawText;
+      }
+    } catch {
+      return fallbackMessage;
+    }
+  }
+
+  return error?.response?.data?.message || fallbackMessage;
+};
+
 const Reports = () => {
   const { user } = useAuth();
   const isAdmin = ["admin", "supervisor"].includes(user?.role);
@@ -44,7 +66,7 @@ const Reports = () => {
       ? "/admin/dashboard"
       : "/user/dashboard";
 
-  const [filters, setFilters] = useState({ college: "", from: "", to: "" });
+  const [filters, setFilters] = useState({ college: "", status: "", from: "", to: "" });
   const [loading, setLoading] = useState({});
 
   const handleChange = (e) =>
@@ -60,10 +82,11 @@ const Reports = () => {
         href: url,
         download: filename(),
       }).click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
       toast.success(`${key.toUpperCase()} downloaded successfully!`);
-    } catch {
-      toast.error(`Failed to download ${key.toUpperCase()} report.`);
+    } catch (error) {
+      const fallbackMessage = `Failed to download ${key.toUpperCase()} report.`;
+      toast.error(await extractDownloadErrorMessage(error, fallbackMessage));
     } finally {
       setLoading((prev) => ({ ...prev, [key]: false }));
     }
@@ -108,6 +131,22 @@ const Reports = () => {
                         {name}
                       </option>
                     ))}
+                  </select>
+                </div>
+              )}
+
+              {isAdmin && (
+                <div className="form-group">
+                  <label>Status</label>
+                  <select
+                    name="status"
+                    value={filters.status}
+                    onChange={handleChange}
+                    className="input"
+                  >
+                    <option value="">All</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
                   </select>
                 </div>
               )}

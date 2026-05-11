@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getMyBookings } from '../../utils/api';
 import Navbar from '../../components/common/Navbar';
-import StatusBadge from '../../components/common/StatusBadge';
+import RecentActivitySection from '../../components/common/RecentActivitySection';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
+import { getRecentApprovedBookings } from '../../utils/recentActivity';
 import '../Dashboard.css';
 
 const UserDashboard = () => {
@@ -31,7 +32,7 @@ const UserDashboard = () => {
   const pending = bookings.filter((b) => b.status === 'pending').length;
   const approved = bookings.filter((b) => b.status === 'approved').length;
   const rejected = bookings.filter((b) => b.status === 'rejected').length;
-  const recent = bookings.slice(0, 5);
+  const recentActivity = getRecentApprovedBookings(bookings);
 
   return (
     <div>
@@ -45,22 +46,22 @@ const UserDashboard = () => {
 
         {/* Stats */}
         <div className="stats-row">
-          <div className="stat-card card">
+          <div className="stat-card card user-stat-card total">
             <div className="stat-number total">{bookings.length}</div>
             <div className="stat-label">Total Requests</div>
           </div>
 
-          <div className="stat-card card">
+          <div className="stat-card card user-stat-card pending">
             <div className="stat-number pending">{pending}</div>
             <div className="stat-label">Pending</div>
           </div>
 
-          <div className="stat-card card">
+          <div className="stat-card card user-stat-card approved">
             <div className="stat-number approved">{approved}</div>
             <div className="stat-label">Approved</div>
           </div>
 
-          <div className="stat-card card">
+          <div className="stat-card card user-stat-card rejected">
             <div className="stat-number rejected">{rejected}</div>
             <div className="stat-label">Rejected</div>
           </div>
@@ -93,41 +94,15 @@ const UserDashboard = () => {
           </Link>
         </div>
 
-        {/* Recent */}
-        <div className="recent-section card">
-          <h3>Recent Requests</h3>
-
-          {loading ? (
-            <p>Loading...</p>
-          ) : recent.length === 0 ? (
-            <p className="empty-msg">
-              No booking requests yet. <Link to="/user/new-booking">Create one →</Link>
-            </p>
-          ) : (
-            <div className="table-card">
-              <table className="bookings-table">
-                <thead>
-                  <tr>
-                    <th>Title</th>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recent.map((b) => (
-                    <tr key={b.id}>
-                      <td>{b.title}</td>
-                      <td>{new Date(b.event_date).toLocaleDateString('en-GB')}</td>
-                      <td>{b.start_time} – {b.end_time}</td>
-                      <td><StatusBadge status={b.status} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <RecentActivitySection
+          bookings={recentActivity}
+          loading={loading}
+          emptyMessage={
+            <>
+              No recent approved activity right now. <Link to="/user/new-booking">Create one →</Link>
+            </>
+          }
+        />
 
       </div>
     </div>

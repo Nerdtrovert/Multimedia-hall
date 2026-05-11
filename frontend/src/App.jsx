@@ -63,8 +63,9 @@ function App() {
                 } />
                   
                 <Route path="/_maintenance/supervisor-access-portal" element={<SupervisorLogin />} />
-                <Route path="/supervisor-login" element={<SupervisorLogin />} />
-                <Route path="/supervisor-access" element={<SupervisorLogin />} />
+                <Route path="/supervisor-login" element={<Navigate to="/_maintenance/supervisor-access-portal" replace />} />
+                <Route path="/supervisor-login/*" element={<Navigate to="/_maintenance/supervisor-access-portal" replace />} />
+                <Route path="/supervisor-access" element={<Navigate to="/_maintenance/supervisor-access-portal" replace />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/about" element={<AboutDevelopers />} />
                 <Route path="/" element={<HomeRedirect />} />

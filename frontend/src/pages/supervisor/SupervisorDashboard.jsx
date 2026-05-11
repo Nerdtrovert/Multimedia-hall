@@ -17,6 +17,7 @@ const SupervisorDashboard = () => {
   const [resettingDb, setResettingDb] = useState(false);
   const [emailResetForm, setEmailResetForm] = useState({ username: '', email: '' });
   const [resetTargets, setResetTargets] = useState([]);
+  const [totalUsers, setTotalUsers] = useState(null);
   const [updatingEmail, setUpdatingEmail] = useState(false);
 
   useEffect(() => {
@@ -30,9 +31,7 @@ const SupervisorDashboard = () => {
             ? payload.users
             : Array.isArray(payload?.targets)
               ? payload.targets
-              : payload && typeof payload === 'object'
-                ? Object.entries(payload).map(([username, email]) => ({ username, email }))
-                : [];
+              : [];
 
         const normalizedTargets = rawTargets
           .map((target) => {
@@ -45,12 +44,19 @@ const SupervisorDashboard = () => {
               target?.username ?? target?.userName ?? target?.user_name ?? ''
             ).trim();
             const email = String(target?.email ?? '').trim();
-            return username ? { username, email } : null;
+            const role = String(target?.role ?? '').trim();
+            const label = String(target?.label ?? '').trim();
+            return username ? { username, email, role, label } : null;
           })
           .filter(Boolean)
-          .sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' }));
+          .sort((a, b) => {
+            if (a.role === 'admin' && b.role !== 'admin') return -1;
+            if (a.role !== 'admin' && b.role === 'admin') return 1;
+            return a.username.localeCompare(b.username, undefined, { sensitivity: 'base' });
+          });
 
         setResetTargets(normalizedTargets);
+        setTotalUsers(typeof payload?.totalUsers === 'number' ? payload.totalUsers : null);
       } catch (err) {
         toast.error(err.response?.data?.message || 'Unable to load usernames for reset.');
       }
@@ -193,10 +199,19 @@ const SupervisorDashboard = () => {
           </button>
         </div>
 
+        {totalUsers !== null && (
+          <div className="stats-row">
+            <div className="stat-card card user-stat-card total">
+              <div className="stat-number total">{totalUsers}</div>
+              <div className="stat-label">Users in table</div>
+            </div>
+          </div>
+        )}
+
         <section className="recent-section supervisor-tools">
           <h3>Supervisor User Email Reset</h3>
           <p className="supervisor-tools-note">
-            Enter a stable username and any valid email for that account. Use the same email to reissue a fresh temporary password, or enter a new email to move the account and send the temporary password there.
+            Select a college account or the NES admin, then enter the email that should receive the temporary password.
           </p>
           <form className="filter-form" onSubmit={handleSupervisorEmailReset}>
             <select
@@ -213,11 +228,12 @@ const SupervisorDashboard = () => {
               required
             >
               <option value="" disabled>
-                {resetTargets.length > 0 ? 'Select username' : 'No usernames available'}
+                {resetTargets.length > 0 ? 'Select account' : 'No accounts available'}
               </option>
               {resetTargets.map((target) => (
                 <option key={target.username} value={target.username}>
-                  {target.username}
+                  {target.label || (target.role === 'admin' ? 'NES Admin' : target.username)}
+                  {target.role === 'admin' ? ` (${target.username})` : ''}
                 </option>
               ))}
             </select>
@@ -232,7 +248,7 @@ const SupervisorDashboard = () => {
               required
             />
             <button type="submit" className="btn btn-primary" disabled={updatingEmail}>
-              {updatingEmail ? 'Sending...' : 'Save Email + Send Password'}
+              {updatingEmail ? 'Sending...' : 'Send Temporary Password'}
             </button>
           </form>
         </section>
