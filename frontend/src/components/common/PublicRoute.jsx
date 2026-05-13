@@ -1,10 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { isRunningInstalledApp } from '../../utils/pushNotifications';
 
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  const isInstalledApp = isRunningInstalledApp();
   const dashboardPathByRole = user?.role === 'supervisor'
     ? '/supervisor/dashboard'
     : user?.role === 'admin'
@@ -16,7 +14,7 @@ const PublicRoute = ({ children }) => {
   }
 
   // If already logged in → redirect
-  if (user && isInstalledApp) {
+  if (user) {
     return (
       <Navigate
         to={dashboardPathByRole}

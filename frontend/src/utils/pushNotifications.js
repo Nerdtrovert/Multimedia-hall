@@ -142,13 +142,16 @@ export const enablePushNotifications = async ({ requestPermission = true, userId
     setStoredToken(token, currentUserId);
   }
 
-  if (!foregroundUnsubscribe) {
-    foregroundUnsubscribe = onMessage(messaging, (payload) => {
-      const title = payload.notification?.title || 'Notification';
-      const body = payload.notification?.body || '';
-      toast.info(body ? `${title}: ${body}` : title);
-    });
+  // Always clean up existing listener before setting up a new one
+  if (foregroundUnsubscribe) {
+    foregroundUnsubscribe();
   }
+  
+  foregroundUnsubscribe = onMessage(messaging, (payload) => {
+    const title = payload.notification?.title || 'Notification';
+    const body = payload.notification?.body || '';
+    toast.info(body ? `${title}: ${body}` : title);
+  });
 };
 
 export const disablePushNotifications = async () => {

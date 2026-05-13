@@ -36,8 +36,10 @@ CREATE TABLE IF NOT EXISTS bookings (
   event_report_original_name VARCHAR(255),
   event_report_mime_type VARCHAR(100),
   event_report_uploaded_at TIMESTAMP NULL,
-  status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+  status ENUM('pending', 'approved', 'rejected', 'cancelled') DEFAULT 'pending',
   admin_note TEXT,
+  cancellation_reason TEXT,
+  cancelled_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

@@ -12,7 +12,7 @@ const EXPORT_TYPES = [
     key: "pdf",
     label: "📄 Download PDF",
     api: downloadPDF,
-    filename: () => "bookings_report.pdf",
+    filename: () => `bookings-report-${new Date().toISOString().slice(0, 10)}.pdf`,
   },
   {
     key: "excel",

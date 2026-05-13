@@ -2,7 +2,7 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
-const { getPrimaryFrontendUrl } = require('../config/env');
+const { getPrimaryFrontendUrl, parseOriginList } = require('../config/env');
 
 let transporter = null;
 let transportVerified = false;
@@ -23,8 +23,15 @@ const joinUrl = (baseUrl, route = '') => {
 };
 
 const getMailUrl = (envValue, fallbackRoute) => {
-  const overrideUrl = trimTrailingSlash(envValue);
-  if (overrideUrl) return overrideUrl;
+  const overrideUrls = parseOriginList(envValue);
+  if (overrideUrls.length > 0) {
+    const overrideUrl = overrideUrls[0];
+    if (isAbsoluteUrl(overrideUrl)) {
+      return overrideUrl;
+    }
+    return joinUrl(getPrimaryFrontendUrl(), overrideUrl || fallbackRoute);
+  }
+
   if (isAbsoluteUrl(fallbackRoute)) return String(fallbackRoute).trim();
   return joinUrl(getPrimaryFrontendUrl(), fallbackRoute);
 };

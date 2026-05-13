@@ -1,62 +1,102 @@
+import { useRef } from 'react';
 import StatusBadge from './StatusBadge';
 import { toApiFileUrl } from '../../utils/api';
 
-const RecentActivitySection = ({
+const AnnouncementsSection = ({
   bookings,
   loading = false,
-  emptyMessage = 'No recent approved activity right now.',
-}) => (
-  <div className="recent-section">
-    <h3>Recent Activity</h3>
+  emptyMessage = 'No announcements right now.',
+}) => {
+  const scrollContainerRef = useRef(null);
 
-    {loading ? (
-      <p>Loading...</p>
-    ) : bookings.length === 0 ? (
-      <p className="empty-msg">{emptyMessage}</p>
-    ) : (
-      <div className="table-card">
-        <table className="bookings-table recent-activity-table">
-          <thead>
-            <tr>
-              <th>College</th>
-              <th>Event</th>
-              <th>Date</th>
-              <th>Timing</th>
-              <th>Status</th>
-              <th>Poster</th>
-            </tr>
-          </thead>
-          <tbody>
+  const scroll = (direction) => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 320;
+      if (direction === 'left') {
+        scrollContainerRef.current.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+      } else {
+        scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      }
+    }
+  };
+
+  return (
+    <div className="announcements-section">
+      <h3>Announcements</h3>
+
+      {loading ? (
+        <p>Loading...</p>
+      ) : bookings.length === 0 ? (
+        <p className="empty-msg">{emptyMessage}</p>
+      ) : (
+        <div className="announcements-container">
+          <button
+            type="button"
+            className="announcements-scroll-btn left"
+            onClick={() => scroll('left')}
+            aria-label="Scroll announcements left"
+          >
+            ‹
+          </button>
+
+          <div
+            className="announcements-scroll-wrapper"
+            ref={scrollContainerRef}
+            role="list"
+            aria-label="Announcements"
+          >
             {bookings.map((booking) => (
-              <tr key={booking.id}>
-                <td>
-                  <strong>{booking.college_name || '—'}</strong>
-                </td>
-                <td>{booking.title}</td>
-                <td>{new Date(booking.event_date).toLocaleDateString('en-GB')}</td>
-                <td>{booking.start_time} – {booking.end_time}</td>
-                <td><StatusBadge status={booking.status} /></td>
-                <td>
+              <article key={booking.id} className="announcements-card card card-hover">
+                <div className="announcements-poster">
                   {booking.poster_url ? (
                     <a
                       href={toApiFileUrl(booking.poster_url)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="link-btn"
+                      aria-label={`Open ${booking.title} poster`}
                     >
-                      View Poster
+                      <img
+                        src={toApiFileUrl(booking.poster_url)}
+                        alt={`${booking.title} poster`}
+                        className="announcements-poster-image"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </a>
                   ) : (
-                    <span className="muted-text">No poster</span>
+                    <div className="announcements-poster-empty">No poster uploaded.</div>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </div>
-);
+                </div>
 
-export default RecentActivitySection;
+                <div className="announcements-body">
+                  <h4 className="announcements-title">{booking.title}</h4>
+                  <p className="announcements-college">{booking.college_name || '—'}</p>
+
+                  <div className="announcements-meta">
+                    <span>{new Date(booking.event_date).toLocaleDateString('en-GB')}</span>
+                    <span>{booking.start_time} – {booking.end_time}</span>
+                  </div>
+
+                  <div className="announcements-footer">
+                    <StatusBadge status={booking.status} />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className="announcements-scroll-btn right"
+            onClick={() => scroll('right')}
+            aria-label="Scroll announcements right"
+          >
+            ›
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AnnouncementsSection;

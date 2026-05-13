@@ -2,6 +2,7 @@ const fs = require("fs");
 const db = require("../config/db");
 const PDFDocument = require("pdfkit");
 const ExcelJS = require("exceljs");
+const { getPrimaryBackendUrl } = require("../config/env");
 const {
   logAudit,
   logError,
@@ -10,6 +11,23 @@ const {
   formatActorIdentity,
   appendActionLog,
 } = require("../utils/audit");
+
+const normalizeUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
+const getPublicBackendOrigin = (req) => {
+  const configuredBackendUrl = normalizeUrl(getPrimaryBackendUrl());
+  if (configuredBackendUrl) {
+    return configuredBackendUrl;
+  }
+
+  const host = req.get("host");
+  if (host) {
+    return normalizeUrl(`${req.protocol}://${host}`);
+  }
+
+  return "";
+};
+const buildBookingFileUrl = (req, bookingId, fileType) =>
+  new URL(`/api/bookings/${bookingId}/${fileType}`, `${getPublicBackendOrigin(req)}/`).toString();
 
 // ─── Helper: fetch bookings for report ───────────────────────────────────────
 async function fetchBookingsForReport(filters, userId = null) {
@@ -135,7 +153,6 @@ const generatePDF = async (req, res) => {
 
   try {
     const bookings = await fetchBookingsForReport(filters, userId);
-    const apiBaseUrl = `${req.protocol}://${req.get("host")}`;
 
     const doc = new PDFDocument({ 
       margin: 40, 
@@ -144,7 +161,7 @@ const generatePDF = async (req, res) => {
     });
 
     const exportDate = new Date().toISOString().slice(0,10);
-    const filename = `bookings_report_${exportDate}.pdf`;
+    const filename = `bookings-report-${exportDate}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     doc.pipe(res);
@@ -283,11 +300,11 @@ const generatePDF = async (req, res) => {
     // Data Rows
     bookings.forEach((b, idx) => {
       const posterUrl = Number(b.has_poster || 0) > 0
-        ? `${apiBaseUrl}/api/bookings/${b.id}/poster`
+        ? buildBookingFileUrl(req, b.id, "poster")
         : null;
 
       const reportUrl = Number(b.has_event_report || 0) > 0
-        ? `${apiBaseUrl}/api/bookings/${b.id}/report`
+        ? buildBookingFileUrl(req, b.id, "report")
         : null;
 
       const cols = [
@@ -342,7 +359,6 @@ const generateExcel = async (req, res) => {
 
   try {
     const bookings = await fetchBookingsForReport(filters, userId);
-    const apiBaseUrl = `${req.protocol}://${req.get('host')}`;
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Bookings");
@@ -383,7 +399,7 @@ const generateExcel = async (req, res) => {
       if (Number(b.has_poster || 0) > 0) {
         row.getCell('poster_url').value = {
           text: 'View Poster',
-          hyperlink: `${apiBaseUrl}/api/bookings/${b.id}/poster`,
+          hyperlink: buildBookingFileUrl(req, b.id, "poster"),
         };
       } else {
         row.getCell('poster_url').value = "—";
@@ -392,7 +408,7 @@ const generateExcel = async (req, res) => {
       if (Number(b.has_event_report || 0) > 0) {
         row.getCell('event_report_url').value = {
           text: 'View Report',
-          hyperlink: `${apiBaseUrl}/api/bookings/${b.id}/report`,
+          hyperlink: buildBookingFileUrl(req, b.id, "report"),
         };
       } else {
         row.getCell('event_report_url').value = "—";

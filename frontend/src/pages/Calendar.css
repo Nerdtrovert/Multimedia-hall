@@ -54,6 +54,34 @@
   background: #22c55e; /* Green */
 }
 
+/* Calendar Legend */
+.calendar-legend {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+  padding: var(--space-md);
+  background: var(--card-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.calendar-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.legend-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
 /* ===============================
    CALENDAR CONTAINER
 ================================ */
@@ -237,7 +265,7 @@
   border: none;
   font-size: 14px;
   cursor: pointer;
-  color: var(--primary-dark);
+  color: white;
   border-radius: 8px;
   padding: 4px 8px;
 }

@@ -33,6 +33,8 @@ const bookingListSelect = `
   b.event_report_uploaded_at,
   b.status,
   b.admin_note,
+  b.cancellation_reason,
+  b.cancelled_at,
   b.created_at,
   b.updated_at,
   CASE
@@ -127,6 +129,82 @@ const sendBookingDecisionNotifications = async (booking, status, adminNote) => {
   results.forEach((result) => {
     if (result.status === 'rejected') {
       console.error('Booking status notification failed:', result.reason?.message || result.reason);
+    }
+  });
+};
+
+const sendBookingCancellationNotificationsToAdmins = async (booking, requester, cancellationReason) => {
+  const [adminRows] = await db.query(
+    `SELECT id, name, email
+     FROM users
+     WHERE role = 'admin'`
+  );
+
+  if (adminRows.length === 0) {
+    console.warn(`No admin users found for booking cancellation notification ${booking.id}.`);
+    return;
+  }
+
+  const notificationTasks = [];
+  const emailedRecipients = new Set();
+  
+  const emailContent = `
+    <h3>Booking Cancellation Notification</h3>
+    <p><strong>Booking ID:</strong> ${booking.id}</p>
+    <p><strong>Title:</strong> ${booking.title}</p>
+    <p><strong>College:</strong> ${booking.college_name}</p>
+    <p><strong>Event Date:</strong> ${booking.event_date}</p>
+    <p><strong>Time:</strong> ${booking.start_time} - ${booking.end_time}</p>
+    <p><strong>Cancelled by:</strong> ${requester.name} (${requester.email})</p>
+    <p><strong>Cancellation Reason:</strong> ${cancellationReason}</p>
+    <p><strong>Previous Status:</strong> ${booking.status}</p>
+  `;
+
+  adminRows.forEach((adminUser) => {
+    const recipientEmail = normalizeEmail(adminUser.email);
+    if (isValidEmail(recipientEmail)) {
+      if (emailedRecipients.has(recipientEmail)) {
+        return;
+      }
+      emailedRecipients.add(recipientEmail);
+      notificationTasks.push(
+        (async () => {
+          const nodemailer = require('nodemailer');
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS,
+            },
+          });
+
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: recipientEmail,
+            subject: `Booking Cancellation - ${booking.title}`,
+            html: emailContent,
+          });
+        })()
+      );
+    } else {
+      console.warn(
+        `Skipping admin cancellation email for user ${adminUser.id}: invalid email "${adminUser.email || ''}"`
+      );
+    }
+  });
+
+  notificationTasks.push(
+    sendBookingStatusPush(
+      adminRows.map((adminUser) => adminUser.id),
+      { ...booking, action: 'cancelled', reason: cancellationReason },
+      'info'
+    )
+  );
+
+  const results = await Promise.allSettled(notificationTasks);
+  results.forEach((result) => {
+    if (result.status === 'rejected') {
+      console.error('Booking cancellation admin notification failed:', result.reason?.message || result.reason);
     }
   });
 };
@@ -332,7 +410,7 @@ const getApprovedBookings = async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      `SELECT id, title, college_name, DATE_FORMAT(event_date, '%Y-%m-%d') AS event_date,
+      `SELECT id, user_id, title, college_name, DATE_FORMAT(event_date, '%Y-%m-%d') AS event_date,
               start_time, end_time, purpose, status, poster_file_path, event_report_file_path,
               CASE
                 WHEN event_report_data IS NOT NULL OR event_report_file_path IS NOT NULL THEN 1
@@ -527,13 +605,6 @@ const getEventReport = async (req, res) => {
       return res.status(404).json({ message: 'Event report not uploaded yet.' });
     }
 
-    const isOwner = req.user.id === booking.user_id;
-    const isAdmin = ['admin', 'supervisor'].includes(req.user.role);
-
-    if (!isAdmin && !isOwner) {
-      return res.status(403).json({ message: 'You are not authorized to access this report.' });
-    }
-
     res.setHeader('Content-Type', booking.event_report_mime_type || 'application/pdf');
     const shouldDownload = ['1', 'true', 'yes'].includes(
       String(req.query.download || '').toLowerCase()
@@ -608,10 +679,15 @@ const getPoster = async (req, res) => {
 
 const cancelMyBooking = async (req, res) => {
   const { id } = req.params;
+  const { reason } = req.body;
+
+  if (!reason || String(reason).trim().length === 0) {
+    return res.status(400).json({ message: 'Cancellation reason is required.' });
+  }
 
   try {
     const [rows] = await db.query(
-      `SELECT id, user_id, status, title, poster_file_path, event_report_file_path
+      `SELECT id, user_id, status, title, college_name, event_date, start_time, end_time, poster_file_path, event_report_file_path
        FROM bookings
        WHERE id = ?`,
       [id]
@@ -626,28 +702,38 @@ const cancelMyBooking = async (req, res) => {
       return res.status(403).json({ message: 'You can only cancel your own booking requests.' });
     }
 
-    if (booking.status !== 'pending') {
-      return res.status(400).json({ message: 'Only pending booking requests can be cancelled.' });
+    if (!['pending', 'approved'].includes(booking.status)) {
+      return res.status(400).json({ message: 'Only pending or approved booking requests can be cancelled.' });
     }
 
-    await db.query('DELETE FROM bookings WHERE id = ? AND user_id = ?', [id, req.user.id]);
-
-    if (booking.poster_file_path) {
-      const posterPath = path.join(uploadsRoot, booking.poster_file_path);
-      if (fs.existsSync(posterPath)) fs.unlinkSync(posterPath);
-    }
-
-    if (booking.event_report_file_path) {
-      const reportPath = path.join(uploadsRoot, booking.event_report_file_path);
-      if (fs.existsSync(reportPath)) fs.unlinkSync(reportPath);
-    }
+    const cancelledAt = new Date();
+    await db.query(
+      `UPDATE bookings 
+       SET status = 'cancelled', cancellation_reason = ?, cancelled_at = ?
+       WHERE id = ? AND user_id = ?`,
+      [String(reason).trim(), cancelledAt, id, req.user.id]
+    );
 
     await logAudit(
       'BOOKING_CANCELLED_BY_USER',
       req.user.id,
       id,
-      `Booking "${booking.title}" cancelled by requester`
+      `Booking "${booking.title}" cancelled by requester. Reason: ${String(reason).trim()}`
     );
+
+    setImmediate(() => {
+      const requester = {
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+      };
+      sendBookingCancellationNotificationsToAdmins(booking, requester, reason).catch((notificationErr) => {
+        console.error(
+          `Booking cancellation admin notifications failed for booking ${id}:`,
+          notificationErr.message
+        );
+      });
+    });
 
     return res.json({ message: 'Booking request cancelled successfully.' });
   } catch (err) {

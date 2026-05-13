@@ -1,11 +1,21 @@
 import axios from "axios";
 
+const normalizeUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
+
+const parseUrlList = (value) =>
+  String(value || "")
+    .split(",")
+    .map((item) => normalizeUrl(item))
+    .filter(Boolean);
+
+const getConfiguredApiBase = () => parseUrlList(import.meta.env.VITE_API_BASE_URL || "/api")[0] || "/api";
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
+  baseURL: getConfiguredApiBase(),
 });
 
 const resolveApiOrigin = () => {
-  const configuredBase = import.meta.env.VITE_API_BASE_URL || "/api";
+  const configuredBase = getConfiguredApiBase();
   if (/^https?:\/\//i.test(configuredBase)) {
     return configuredBase.replace(/\/api\/?$/, "");
   }
@@ -63,8 +73,8 @@ export const unregisterPushToken = (token) =>
 // Bookings - College
 export const submitBooking = (data) => api.post("/bookings", data);
 export const getMyBookings = () => api.get("/bookings/my");
-export const cancelBookingRequest = (bookingId) =>
-  api.delete(`/bookings/${bookingId}`);
+export const cancelBookingRequest = (bookingId, reason) =>
+  api.delete(`/bookings/${bookingId}`, { data: { reason } });
 export const uploadEventReport = (bookingId, file) => {
   const formData = new FormData();
   formData.append("event_report", file);
@@ -181,5 +191,7 @@ export const logAnalyticsEvent = (eventName, eventData) =>
 // Firebase Health Check
 export const checkFirebaseHealth = () =>
   api.get('/firebase/health');
+
+export { resolveApiOrigin };
 
 export default api;

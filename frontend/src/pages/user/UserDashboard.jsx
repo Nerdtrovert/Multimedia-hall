@@ -1,23 +1,32 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getMyBookings } from '../../utils/api';
+import { getMyBookings, getCalendarBookings } from '../../utils/api';
 import Navbar from '../../components/common/Navbar';
-import RecentActivitySection from '../../components/common/RecentActivitySection';
+import AnnouncementsSection from '../../components/common/RecentActivitySection';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
-import { getRecentApprovedBookings } from '../../utils/recentActivity';
+import { getAnnouncementCards } from '../../utils/recentActivity';
 import '../Dashboard.css';
 
 const UserDashboard = () => {
   const { user } = useAuth();
   const [bookings, setBookings] = useState([]);
+  const [commonBookings, setCommonBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchBookings = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
-      const res = await getMyBookings();
-      setBookings(res.data);
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().split('T')[0];
+      const end = new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString().split('T')[0];
+      
+      const [myRes, calendarRes] = await Promise.all([
+        getMyBookings(),
+        getCalendarBookings(start, end),
+      ]);
+      setBookings(myRes.data);
+      setCommonBookings(calendarRes.data || []);
     } finally {
       if (showLoader) setLoading(false);
     }
@@ -32,7 +41,7 @@ const UserDashboard = () => {
   const pending = bookings.filter((b) => b.status === 'pending').length;
   const approved = bookings.filter((b) => b.status === 'approved').length;
   const rejected = bookings.filter((b) => b.status === 'rejected').length;
-  const recentActivity = getRecentApprovedBookings(bookings);
+  const recentActivity = getAnnouncementCards(commonBookings);
 
   return (
     <div>
@@ -94,12 +103,12 @@ const UserDashboard = () => {
           </Link>
         </div>
 
-        <RecentActivitySection
-          bookings={recentActivity}
+        <AnnouncementsSection
+          bookings={recentActivity.all}
           loading={loading}
           emptyMessage={
             <>
-              No recent approved activity right now. <Link to="/user/new-booking">Create one →</Link>
+              No announcements right now. <Link to="/user/new-booking">Create one →</Link>
             </>
           }
         />

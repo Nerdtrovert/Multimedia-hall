@@ -5,7 +5,16 @@ import App from './App';
 import './index.css';
 import { initializeFirebase } from './utils/firebaseClient';
 
-registerSW({ immediate: true });
+if (import.meta.env.PROD) {
+  registerSW({ immediate: true });
+} else if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  // Clear any old PWA workers in local dev so config changes are applied immediately.
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
+      registration.unregister();
+    });
+  });
+}
 
 // Initialize Firebase
 initializeFirebase().then((initialized) => {

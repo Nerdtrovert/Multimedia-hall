@@ -88,10 +88,6 @@ const Login = () => {
     }
   };
 
-  const handlePasswordTogglePointerDown = (e) => {
-    e.preventDefault();
-  };
-
   return (
     <div className="login-wrapper">
 
@@ -155,8 +151,6 @@ const Login = () => {
                   <button
                     type="button"
                     className="password-toggle"
-                    onMouseDown={handlePasswordTogglePointerDown}
-                    onPointerDown={handlePasswordTogglePointerDown}
                     onClick={() => setShowPassword((value) => !value)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     aria-pressed={showPassword}

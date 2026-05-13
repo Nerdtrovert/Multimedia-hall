@@ -33,3 +33,10 @@
   color: #dc2626;
   border-color: #fecaca;
 }
+
+/* Cancelled → Gray */
+.status-badge.cancelled {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}

@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import PublicRoute from './components/common/PublicRoute';
 import PWAInstallButton from './components/common/PWAInstallButton';
-import { isRunningInstalledApp } from './utils/pushNotifications';
 
 import './App.css';
 
@@ -18,6 +17,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const CalendarView = lazy(() => import('./pages/CalendarView'));
 const Reports = lazy(() => import('./pages/Reports'));
+const BookingFileAccess = lazy(() => import('./pages/BookingFileAccess'));
 const UserDashboard = lazy(() => import('./pages/user/UserDashboard'));
 const NewBooking = lazy(() => import('./pages/user/NewBooking'));
 const MyBookings = lazy(() => import('./pages/user/MyBookings'));
@@ -30,11 +30,10 @@ const AboutDevelopers = lazy(() => import('./pages/AboutDevelopers'));
 /* Smart redirect component */
 const HomeRedirect = () => {
   const { user, loading } = useAuth();
-  const isInstalledApp = isRunningInstalledApp();
 
   if (loading) return <div className="loading-screen">Loading...</div>;
 
-  if (!user || !isInstalledApp) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
 
   const dashboardPathByRole = user.role === 'supervisor'
     ? '/supervisor/dashboard'
@@ -85,6 +84,7 @@ function App() {
                 <Route path="/user/reports" element={
                   <ProtectedRoute role="college"><Reports /></ProtectedRoute>
                 } />
+                <Route path="/files/bookings/:bookingId/:fileType" element={<BookingFileAccess />} />
                 <Route path="/user/change-password" element={
                   <ProtectedRoute role="college"><ChangePassword /></ProtectedRoute>
                 } />

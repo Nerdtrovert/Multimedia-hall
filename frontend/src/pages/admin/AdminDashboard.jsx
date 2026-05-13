@@ -13,10 +13,10 @@ import {
 } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/common/Navbar';
-import RecentActivitySection from '../../components/common/RecentActivitySection';
+import AnnouncementsSection from '../../components/common/RecentActivitySection';
 import StatusBadge from '../../components/common/StatusBadge';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
-import { getRecentApprovedBookings } from '../../utils/recentActivity';
+import { getAnnouncementCards } from '../../utils/recentActivity';
 import '../Dashboard.css';
 
 const AdminDashboard = () => {
@@ -172,7 +172,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const recentActivity = getRecentApprovedBookings(bookings);
+  const recentActivity = getAnnouncementCards(bookings);
 
   return (
     <div>
@@ -276,14 +276,6 @@ const AdminDashboard = () => {
         </div>
 
         {isSupervisor && (
-          <RecentActivitySection
-            bookings={recentActivity}
-            loading={loading}
-            emptyMessage="No recent approved activity right now."
-          />
-        )}
-
-        {isSupervisor && (
         <section className="recent-section supervisor-tools">
             <h3>Supervisor User Email Reset</h3>
             <p className="supervisor-tools-note">
@@ -328,10 +320,10 @@ const AdminDashboard = () => {
         )}
 
         {!isSupervisor && (
-          <RecentActivitySection
-            bookings={recentActivity}
+          <AnnouncementsSection
+            bookings={recentActivity.all}
             loading={loading}
-            emptyMessage="No recent approved activity right now."
+            emptyMessage="No announcements right now."
           />
         )}
 
