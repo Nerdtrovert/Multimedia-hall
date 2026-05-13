@@ -4,10 +4,11 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useNavigate } from 'react-router-dom';
-import { getCalendarBookings, openProtectedFileInNewTab, toApiFileUrl } from '../utils/api';
+import { getCalendarBookings, toApiFileUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/common/Navbar';
 import PageBackButton from '../components/common/PageBackButton';
+import { getReportViewRoute } from '../utils/fileHelpers';
 import { toast } from 'react-toastify';
 import './Calendar.css';
 
@@ -195,15 +196,6 @@ const CalendarView = () => {
     }));
   };
 
-  const openEventReport = async (url) => {
-    if (!url) return;
-    try {
-      await openProtectedFileInNewTab(url);
-    } catch {
-      toast.error('Failed to open report');
-    }
-  };
-
   return (
     <div>
       <Navbar />
@@ -339,14 +331,14 @@ const CalendarView = () => {
                 {selectedEvent.event_report_url && (
                   <p>
                     <strong>Event report:</strong>{' '}
-                    <button
+                    <a
                       className="link-btn"
-                      onClick={() =>
-                        openEventReport(selectedEvent.event_report_url)
-                      }
+                      href={getReportViewRoute(selectedEvent)}
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
                       View report
-                    </button>
+                    </a>
                   </p>
                 )}
               </div>

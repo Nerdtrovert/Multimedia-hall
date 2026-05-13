@@ -14,6 +14,31 @@ const api = axios.create({
   baseURL: getConfiguredApiBase(),
 });
 
+const normalizeProtectedApiPath = (protectedPath) => {
+  const rawPath = String(protectedPath || "").trim();
+  if (!rawPath) return "";
+
+  let normalizedPath = rawPath;
+  if (/^https?:\/\//i.test(rawPath)) {
+    try {
+      const parsedUrl = new URL(rawPath);
+      normalizedPath = `${parsedUrl.pathname}${parsedUrl.search}`;
+    } catch {
+      normalizedPath = rawPath;
+    }
+  }
+
+  if (normalizedPath === "/api") {
+    return "/";
+  }
+
+  if (normalizedPath.startsWith("/api/")) {
+    return normalizedPath.slice(4);
+  }
+
+  return normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`;
+};
+
 const resolveApiOrigin = () => {
   const configuredBase = getConfiguredApiBase();
   if (/^https?:\/\//i.test(configuredBase)) {
@@ -105,8 +130,51 @@ export const clearActionLogs = () => api.delete("/reports/action-logs");
 export const toApiFileUrl = (relativePath) =>
   relativePath ? `${resolveApiOrigin()}${relativePath}` : null;
 
+export const fetchProtectedFileBlob = async (protectedPath) => {
+  const normalizedPath = normalizeProtectedApiPath(protectedPath);
+  return api.get(normalizedPath, { responseType: "blob" });
+};
+
+const readBlobTextSafely = async (blobLike) => {
+  if (!blobLike || typeof blobLike.text !== "function") {
+    return "";
+  }
+
+  try {
+    return await blobLike.text();
+  } catch {
+    return "";
+  }
+};
+
+export const getProtectedFileErrorMessage = async (
+  error,
+  fallbackMessage = "Unable to open this file.",
+) => {
+  const directMessage = error?.response?.data?.message;
+  if (typeof directMessage === "string" && directMessage.trim()) {
+    return directMessage;
+  }
+
+  const blobText = await readBlobTextSafely(error?.response?.data);
+  if (blobText) {
+    try {
+      const parsed = JSON.parse(blobText);
+      if (typeof parsed?.message === "string" && parsed.message.trim()) {
+        return parsed.message;
+      }
+    } catch {
+      if (blobText.trim()) {
+        return blobText.trim();
+      }
+    }
+  }
+
+  return fallbackMessage;
+};
+
 export const openProtectedFileInNewTab = async (protectedPath) => {
-  const response = await api.get(protectedPath, { responseType: "blob" });
+  const response = await fetchProtectedFileBlob(protectedPath);
   const contentType =
     response.headers?.["content-type"] || "application/octet-stream";
   const blob = new Blob([response.data], { type: contentType });
@@ -135,7 +203,7 @@ export const downloadProtectedFile = async (
   protectedPath,
   fallbackName = "file.pdf",
 ) => {
-  const response = await api.get(protectedPath, { responseType: "blob" });
+  const response = await fetchProtectedFileBlob(protectedPath);
   const contentType =
     response.headers?.["content-type"] || "application/octet-stream";
   const contentDisposition = response.headers?.["content-disposition"];

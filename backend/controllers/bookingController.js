@@ -94,12 +94,24 @@ const toApiPosterUrl = (booking) => {
   return null;
 };
 
+const toFrontendFileRoute = (bookingId, fileType, download = false) =>
+  `/files/bookings/${bookingId}/${fileType}${download ? '?download=1' : ''}`;
+
 const withFileLinks = (booking) => ({
   ...booking,
   poster_url: toApiPosterUrl(booking),
+  poster_route_url: toFrontendFileRoute(booking.id, 'poster'),
   event_report_url:
     Number(booking.has_event_report || 0) > 0 || booking.event_report_file_path
       ? `/api/bookings/${booking.id}/report`
+      : null,
+  event_report_route_url:
+    Number(booking.has_event_report || 0) > 0 || booking.event_report_file_path
+      ? toFrontendFileRoute(booking.id, 'report')
+      : null,
+  event_report_download_url:
+    Number(booking.has_event_report || 0) > 0 || booking.event_report_file_path
+      ? toFrontendFileRoute(booking.id, 'report', true)
       : null,
 });
 
@@ -578,6 +590,8 @@ const uploadEventReport = async (req, res) => {
     return res.json({
       message: 'Event report uploaded successfully.',
       event_report_url: `/api/bookings/${id}/report`,
+      event_report_route_url: toFrontendFileRoute(id, 'report'),
+      event_report_download_url: toFrontendFileRoute(id, 'report', true),
     });
   } catch (err) {
     logError('Upload event report error', err);

@@ -4,7 +4,7 @@ import {
   getAllBookings,
   toApiFileUrl,
 } from '../../utils/api';
-import { openReport, downloadReport } from '../../utils/fileHelpers';
+import { getReportDownloadRoute, getReportViewRoute } from '../../utils/fileHelpers';
 import { toast } from 'react-toastify';
 import Navbar from '../../components/common/Navbar';
 import PageBackButton from '../../components/common/PageBackButton';
@@ -270,20 +270,22 @@ const AllBookings = () => {
                       <td>
                         {b.event_report_url ? (
                           <div style={{ display: 'grid', gap: 6 }}>
-                            <button
-                              type="button"
+                            <a
+                              href={getReportViewRoute(b)}
                               className="link-btn"
-                              onClick={() => openReport(b)}
+                              target="_blank"
+                              rel="noopener noreferrer"
                             >
                               View report
-                            </button>
-                            <button
-                              type="button"
+                            </a>
+                            <a
+                              href={getReportDownloadRoute(b)}
                               className="link-btn"
-                              onClick={() => downloadReport(b)}
+                              target="_blank"
+                              rel="noopener noreferrer"
                             >
                               Download report
-                            </button>
+                            </a>
                           </div>
                         ) : (
                           <span style={{ color: '#9ca3af' }}>—</span>
