@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+const isPageVisible = () =>
+  typeof document !== 'undefined' && document.visibilityState === 'visible';
+
 const useAutoRefresh = (refreshFn, intervalMs = 10000, enabled = true) => {
   const refreshRef = useRef(refreshFn);
 
@@ -11,8 +14,11 @@ const useAutoRefresh = (refreshFn, intervalMs = 10000, enabled = true) => {
     if (!enabled) return undefined;
 
     const intervalId = setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      refreshRef.current();
+      if (!isPageVisible()) return;
+
+      Promise.resolve(refreshRef.current()).catch((err) => {
+        console.error('Auto refresh failed:', err);
+      });
     }, intervalMs);
 
     return () => clearInterval(intervalId);

@@ -2,6 +2,7 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { toast } from 'react-toastify';
 import { registerPushToken, unregisterPushToken } from './api';
+import { getStoredAuthUserId } from './authSession';
 
 const TOKEN_STORAGE_KEY = 'fcm_token';
 let foregroundUnsubscribe = null;
@@ -64,17 +65,6 @@ const ensureFirebaseApp = () => {
   return initializeApp(getFirebaseConfig());
 };
 
-const getCurrentAuthUserId = () => {
-  try {
-    const rawAuthSession = localStorage.getItem('auth_session');
-    if (!rawAuthSession) return null;
-    const parsedAuthSession = JSON.parse(rawAuthSession);
-    return parsedAuthSession?.user?.id ? String(parsedAuthSession.user.id) : null;
-  } catch {
-    return null;
-  }
-};
-
 const getStoredTokenRecord = () => {
   const storedValue = localStorage.getItem(TOKEN_STORAGE_KEY);
   if (!storedValue) return { token: null, userId: null };
@@ -96,7 +86,7 @@ const getStoredTokenRecord = () => {
 
 const getStoredToken = () => getStoredTokenRecord().token;
 
-const setStoredToken = (token, userId = getCurrentAuthUserId()) => {
+const setStoredToken = (token, userId = getStoredAuthUserId()) => {
   if (token) {
     localStorage.setItem(
       TOKEN_STORAGE_KEY,

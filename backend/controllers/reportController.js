@@ -13,6 +13,7 @@ const {
 } = require("../utils/audit");
 
 const normalizeUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
+
 const getPublicBackendOrigin = (req) => {
   const configuredBackendUrl = normalizeUrl(getPrimaryBackendUrl());
   if (configuredBackendUrl) {
@@ -28,6 +29,23 @@ const getPublicBackendOrigin = (req) => {
 };
 const buildBookingFileUrl = (req, bookingId, fileType) =>
   new URL(`/api/bookings/${bookingId}/${fileType}`, `${getPublicBackendOrigin(req)}/`).toString();
+
+const REPORT_HEADERS = [
+  "Sl no",
+  "College",
+  "Title",
+  "Purpose",
+  "Date",
+  "Start Time",
+  "End Time",
+  "Status",
+  "Poster Link",
+  "Post-Event Report Link",
+];
+
+const REPORT_COLUMN_WIDTHS = [35, 130, 0, 0, 68, 62, 62, 86, 78, 105];
+
+const formatFileLinkCell = (hasFile, label, link) => (hasFile ? { text: label, link } : "—");
 
 // ─── Helper: fetch bookings for report ───────────────────────────────────────
 async function fetchBookingsForReport(filters, userId = null) {
@@ -139,8 +157,6 @@ const validateReportFilters = (filters) => {
   return null;
 };
 
-// ─── Generate PDF report ──────────────────────────────────────────────────────
-// ─── Generate PDF report ──────────────────────────────────────────────────────
 const generatePDF = async (req, res) => {
   const isAdmin = ["admin", "supervisor"].includes(req.user.role);
   const filters = req.query;
@@ -178,35 +194,17 @@ const generatePDF = async (req, res) => {
     const rightMargin = 50;
     const availableWidth = pageWidth - leftMargin - rightMargin;
 
-    const headers = [
-      "Sl no", "College", "Title", "Purpose", "Date", 
-      "Start Time", "End Time", "Status", "Poster Link", "Post-Event Report Link"
-    ];
-
-    // Fluid Column Widths
-    const colWidths = [
-      35,   // Sl no
-      130,  // College
-      0,    // Title     → will be calculated (flexible)
-      0,    // Purpose   → will be calculated (flexible)
-      68,   // Date
-      62,   // Start Time
-      62,   // End Time
-      86,   // Status
-      78,   // Poster Link
-      105   // Report Link
-    ];
-
-    // Calculate flexible widths for Title & Purpose
+    const headers = REPORT_HEADERS;
+    const colWidths = [...REPORT_COLUMN_WIDTHS];
     const fixedWidth = colWidths.reduce((sum, w) => sum + (w || 0), 0);
     const remainingWidth = availableWidth - fixedWidth;
-    const flexibleEach = Math.floor(remainingWidth / 2); // Equal share for Title & Purpose
+    const flexibleEach = Math.floor(remainingWidth / 2);
 
-    colWidths[2] = flexibleEach;      // Title
-    colWidths[3] = flexibleEach - 5;  // Purpose (slightly smaller)
+    colWidths[2] = flexibleEach;
+    colWidths[3] = flexibleEach - 5;
 
     const totalTableWidth = colWidths.reduce((a, b) => a + b, 0);
-    const TABLE_LEFT = leftMargin + Math.floor((availableWidth - totalTableWidth) / 2); // Center table
+    const TABLE_LEFT = leftMargin + Math.floor((availableWidth - totalTableWidth) / 2);
 
     const TABLE_RIGHT = TABLE_LEFT + totalTableWidth;
     const CELL_X_PADDING = 4;
@@ -299,13 +297,9 @@ const generatePDF = async (req, res) => {
 
     // Data Rows
     bookings.forEach((b, idx) => {
-      const posterUrl = Number(b.has_poster || 0) > 0
-        ? buildBookingFileUrl(req, b.id, "poster")
-        : null;
-
-      const reportUrl = Number(b.has_event_report || 0) > 0
-        ? buildBookingFileUrl(req, b.id, "report")
-        : null;
+      const posterUrl = Number(b.has_poster || 0) > 0 ? buildBookingFileUrl(req, b.id, "poster") : null;
+      const reportUrl =
+        Number(b.has_event_report || 0) > 0 ? buildBookingFileUrl(req, b.id, "report") : null;
 
       const cols = [
         idx + 1,
@@ -316,8 +310,8 @@ const generatePDF = async (req, res) => {
         b.start_time || "—",
         b.end_time || "—",
         toReportStatus(b),
-        posterUrl ? { text: "View Poster", link: posterUrl } : "—",
-        reportUrl ? { text: "View Report", link: reportUrl } : "—",
+        formatFileLinkCell(Boolean(posterUrl), "View Poster", posterUrl),
+        formatFileLinkCell(Boolean(reportUrl), "View Report", reportUrl),
       ];
 
       const rowHeight = getRowHeight(cols);
@@ -364,16 +358,16 @@ const generateExcel = async (req, res) => {
     const sheet = workbook.addWorksheet("Bookings");
 
     sheet.columns = [
-      { header: "Sl no", key: "sl_no", width: 8 },
-      { header: "College", key: "college_name", width: 20 },
-      { header: "Title", key: "title", width: 30 },
-      { header: "Purpose", key: "purpose", width: 30 },
-      { header: "Date", key: "event_date", width: 15 },
-      { header: "Start Time", key: "start_time", width: 12 },
-      { header: "End Time", key: "end_time", width: 12 },
-      { header: "Status", key: "status", width: 12 },
-      { header: "Poster Link", key: "poster_url", width: 20 },
-      { header: "Post-Event Report Link", key: "event_report_url", width: 25 },
+      { header: REPORT_HEADERS[0], key: "sl_no", width: 8 },
+      { header: REPORT_HEADERS[1], key: "college_name", width: 20 },
+      { header: REPORT_HEADERS[2], key: "title", width: 30 },
+      { header: REPORT_HEADERS[3], key: "purpose", width: 30 },
+      { header: REPORT_HEADERS[4], key: "event_date", width: 15 },
+      { header: REPORT_HEADERS[5], key: "start_time", width: 12 },
+      { header: REPORT_HEADERS[6], key: "end_time", width: 12 },
+      { header: REPORT_HEADERS[7], key: "status", width: 12 },
+      { header: REPORT_HEADERS[8], key: "poster_url", width: 20 },
+      { header: REPORT_HEADERS[9], key: "event_report_url", width: 25 },
     ];
 
     // Style header row
@@ -396,23 +390,16 @@ const generateExcel = async (req, res) => {
         status: toReportStatus(b),
       });
 
-      if (Number(b.has_poster || 0) > 0) {
-        row.getCell('poster_url').value = {
-          text: 'View Poster',
-          hyperlink: buildBookingFileUrl(req, b.id, "poster"),
-        };
-      } else {
-        row.getCell('poster_url').value = "—";
-      }
-
-      if (Number(b.has_event_report || 0) > 0) {
-        row.getCell('event_report_url').value = {
-          text: 'View Report',
-          hyperlink: buildBookingFileUrl(req, b.id, "report"),
-        };
-      } else {
-        row.getCell('event_report_url').value = "—";
-      }
+      row.getCell("poster_url").value = formatFileLinkCell(
+        Number(b.has_poster || 0) > 0,
+        "View Poster",
+        buildBookingFileUrl(req, b.id, "poster"),
+      );
+      row.getCell("event_report_url").value = formatFileLinkCell(
+        Number(b.has_event_report || 0) > 0,
+        "View Report",
+        buildBookingFileUrl(req, b.id, "report"),
+      );
     });
 
     const exportDate = new Date().toISOString().slice(0,10);

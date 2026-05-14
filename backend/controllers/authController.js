@@ -10,6 +10,8 @@ const {
   sendPasswordResetPush,
 } = require('../utils/pushNotifications');
 
+const TEMP_PASSWORD_LENGTH = 7;
+
 const login = async (req, res) => {
   const { email, password } = req.body;
   const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -145,14 +147,35 @@ const getMe = async (req, res) => {
 
 const generateTemporaryPassword = () => {
   const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-  const bytes = crypto.randomBytes(12);
+  const bytes = crypto.randomBytes(TEMP_PASSWORD_LENGTH);
   let password = '';
 
-  for (let i = 0; i < 12; i += 1) {
+  for (let i = 0; i < TEMP_PASSWORD_LENGTH; i += 1) {
     password += charset[bytes[i] % charset.length];
   }
 
   return password;
+};
+
+const issueTemporaryPassword = async ({
+  recipientEmail,
+  recipientName,
+  updatePassword,
+  rollbackPassword,
+}) => {
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+
+  await updatePassword(passwordHash);
+
+  try {
+    await sendPasswordResetEmail(recipientEmail, recipientName, temporaryPassword);
+  } catch (mailErr) {
+    await rollbackPassword();
+    throw mailErr;
+  }
+
+  return temporaryPassword;
 };
 
 const configuredAdminUsername = String(process.env.SEED_ADMIN_USERNAME || 'nes-admin').trim() || 'nes-admin';
@@ -179,17 +202,14 @@ const forgotPassword = async (req, res) => {
       return res.status(400).json({ message: 'No valid email is registered for this account.' });
     }
 
-    const temporaryPassword = generateTemporaryPassword();
-    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
-
-    await db.query('UPDATE users SET password = ? WHERE id = ?', [passwordHash, user.id]);
-
-    try {
-      await sendPasswordResetEmail(recipientEmail, user.name, temporaryPassword);
-    } catch (mailErr) {
-      await db.query('UPDATE users SET password = ? WHERE id = ?', [user.password, user.id]);
-      throw mailErr;
-    }
+    await issueTemporaryPassword({
+      recipientEmail,
+      recipientName: user.name,
+      updatePassword: (passwordHash) =>
+        db.query('UPDATE users SET password = ? WHERE id = ?', [passwordHash, user.id]),
+      rollbackPassword: () =>
+        db.query('UPDATE users SET password = ? WHERE id = ?', [user.password, user.id]),
+    });
 
     try {
       await sendPasswordResetPush(user.id);
@@ -319,25 +339,22 @@ const supervisorResetUserEmail = async (req, res) => {
       return res.status(409).json({ message: 'This email is already used by another user.' });
     }
 
-    const temporaryPassword = generateTemporaryPassword();
-    const newPasswordHash = await bcrypt.hash(temporaryPassword, 10);
-
-    await db.query('UPDATE users SET email = ?, password = ? WHERE id = ?', [
-      updatedEmail,
-      newPasswordHash,
-      targetUser.id,
-    ]);
-
-    try {
-      await sendPasswordResetEmail(updatedEmail, targetUser.name, temporaryPassword);
-    } catch (mailErr) {
-      await db.query('UPDATE users SET email = ?, password = ? WHERE id = ?', [
-        targetUser.email,
-        targetUser.password,
-        targetUser.id,
-      ]);
-      throw mailErr;
-    }
+    await issueTemporaryPassword({
+      recipientEmail: updatedEmail,
+      recipientName: targetUser.name,
+      updatePassword: (passwordHash) =>
+        db.query('UPDATE users SET email = ?, password = ? WHERE id = ?', [
+          updatedEmail,
+          passwordHash,
+          targetUser.id,
+        ]),
+      rollbackPassword: () =>
+        db.query('UPDATE users SET email = ?, password = ? WHERE id = ?', [
+          targetUser.email,
+          targetUser.password,
+          targetUser.id,
+        ]),
+    });
 
     const currentEmail = normalizeEmail(targetUser.email);
     const emailChanged = currentEmail !== updatedEmail;

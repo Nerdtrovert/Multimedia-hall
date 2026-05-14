@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getStoredAuthToken } from "./authSession";
 
 const normalizeUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
 
@@ -47,32 +48,6 @@ const resolveApiOrigin = () => {
   return window.location.origin;
 };
 
-// Auth
-export const loginUser = (data) => api.post('/auth/login', data);
-const getStoredAuthToken = () => {
-  const legacyToken = localStorage.getItem("token");
-  if (legacyToken) return legacyToken;
-
-  const rawAuthSession = localStorage.getItem("auth_session");
-  if (!rawAuthSession) return null;
-
-  try {
-    const parsedAuthSession = JSON.parse(rawAuthSession);
-    if (
-      !parsedAuthSession?.token ||
-      !parsedAuthSession?.expiresAt ||
-      parsedAuthSession.expiresAt <= Date.now()
-    ) {
-      localStorage.removeItem("auth_session");
-      return null;
-    }
-    return parsedAuthSession.token;
-  } catch {
-    localStorage.removeItem("auth_session");
-    return null;
-  }
-};
-
 // Attach token from persisted auth session (or legacy token) on every request
 api.interceptors.request.use((config) => {
   const token = getStoredAuthToken();
@@ -80,59 +55,131 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+const request = (method, url, data, config = {}) =>
+  api.request({ method, url, data, ...config });
+const get = (url, config = {}) => request("get", url, undefined, config);
+const post = (url, data, config = {}) => request("post", url, data, config);
+const patch = (url, data, config = {}) => request("patch", url, data, config);
+const del = (url, data, config = {}) => request("delete", url, data, config);
+const blobGet = (url, config = {}) => get(url, { ...config, responseType: "blob" });
+
+const AUTH_ENDPOINTS = {
+  login: "/auth/login",
+  forgotPassword: "/auth/forgot-password",
+  changePassword: "/auth/change-password",
+  resetTargets: "/auth/_internal/maintenance/reset-user-targets",
+  resetUserEmail: "/auth/_internal/maintenance/reset-user-email",
+  resetOperationalData: "/auth/_internal/maintenance/reset-operational-data",
+  pushToken: "/auth/push-token",
+};
+
+const BOOKING_ENDPOINTS = {
+  submit: "/bookings",
+  mine: "/bookings/my",
+  calendar: "/bookings/calendar",
+  all: "/bookings",
+  pending: "/bookings/pending",
+};
+
+const REPORT_ENDPOINTS = {
+  pdf: "/reports/pdf",
+  excel: "/reports/excel",
+  analytics: "/reports/analytics",
+  actionLogs: "/reports/action-logs",
+};
+
+const FIREBASE_ENDPOINTS = {
+  firestoreRoot: "/firebase/firestore",
+  realtimeRoot: "/firebase/realtime",
+  analyticsLog: "/firebase/analytics/log",
+  health: "/firebase/health",
+};
+
 // Auth
-export const forgotPassword = (email) =>
-  api.post("/auth/forgot-password", { email });
+export const loginUser = (data) => post(AUTH_ENDPOINTS.login, data);
+export const forgotPassword = (email) => post(AUTH_ENDPOINTS.forgotPassword, { email });
 export const changePassword = (oldPassword, newPassword) =>
-  api.post("/auth/change-password", { oldPassword, newPassword });
-export const getSupervisorResetTargets = () =>
-  api.get('/auth/_internal/maintenance/reset-user-targets');
+  post(AUTH_ENDPOINTS.changePassword, { oldPassword, newPassword });
+export const getSupervisorResetTargets = () => get(AUTH_ENDPOINTS.resetTargets);
 export const supervisorResetUserEmail = (username, email) =>
-  api.post('/auth/_internal/maintenance/reset-user-email', { username, email });
+  post(AUTH_ENDPOINTS.resetUserEmail, { username, email });
 export const supervisorResetOperationalData = () =>
-  api.post('/auth/_internal/maintenance/reset-operational-data', { confirm: 'RESET' });
-export const registerPushToken = (token) => api.post('/auth/push-token', { token });
-export const unregisterPushToken = (token) =>
-  api.delete('/auth/push-token', { data: token ? { token } : {} });
+  post(AUTH_ENDPOINTS.resetOperationalData, { confirm: "RESET" });
+export const registerPushToken = (token) => post(AUTH_ENDPOINTS.pushToken, { token });
+export const unregisterPushToken = (token) => del(AUTH_ENDPOINTS.pushToken, token ? { token } : {});
 
 // Bookings - College
-export const submitBooking = (data) => api.post("/bookings", data);
-export const getMyBookings = () => api.get("/bookings/my");
+export const submitBooking = (data) => post(BOOKING_ENDPOINTS.submit, data);
+export const getMyBookings = () => get(BOOKING_ENDPOINTS.mine);
 export const cancelBookingRequest = (bookingId, reason) =>
-  api.delete(`/bookings/${bookingId}`, { data: { reason } });
+  del(`/bookings/${bookingId}`, { reason });
 export const uploadEventReport = (bookingId, file) => {
   const formData = new FormData();
   formData.append("event_report", file);
-  return api.post(`/bookings/${bookingId}/report`, formData);
+  return post(`/bookings/${bookingId}/report`, formData);
 };
 
 // Bookings - Common
 export const getCalendarBookings = (start, end) =>
-  api.get("/bookings/calendar", {
+  get(BOOKING_ENDPOINTS.calendar, {
     params: { start, end },
   });
+
 // Bookings - Admin
-export const getAllBookings = (params) => api.get("/bookings", { params });
-export const getPendingBookings = () => api.get("/bookings/pending");
+export const getAllBookings = (params) => get(BOOKING_ENDPOINTS.all, { params });
+export const getPendingBookings = () => get(BOOKING_ENDPOINTS.pending);
 export const updateBookingStatus = (id, status, admin_note) =>
-  api.patch(`/bookings/${id}/status`, { status, admin_note });
+  patch(`/bookings/${id}/status`, { status, admin_note });
 
 // Reports
-export const downloadPDF = (params) =>
-  api.get("/reports/pdf", { params, responseType: "blob" });
-export const downloadExcel = (params) =>
-  api.get("/reports/excel", { params, responseType: "blob" });
-export const getAnalytics = () => api.get("/reports/analytics");
-export const downloadActionLogs = () =>
-  api.get("/reports/action-logs/download", { responseType: "blob" });
-export const clearActionLogs = () => api.delete("/reports/action-logs");
+export const downloadPDF = (params) => blobGet(REPORT_ENDPOINTS.pdf, { params });
+export const downloadExcel = (params) => blobGet(REPORT_ENDPOINTS.excel, { params });
+export const getAnalytics = () => get(REPORT_ENDPOINTS.analytics);
+export const downloadActionLogs = () => blobGet(`${REPORT_ENDPOINTS.actionLogs}/download`);
+export const clearActionLogs = () => del(REPORT_ENDPOINTS.actionLogs);
+
+// Firebase Firestore API
+export const setFirestoreDocument = (collection, documentId, data) =>
+  post(`${FIREBASE_ENDPOINTS.firestoreRoot}/${collection}`, { documentId, data });
+
+export const getFirestoreDocument = (collection, documentId) =>
+  get(`${FIREBASE_ENDPOINTS.firestoreRoot}/${collection}/${documentId}`);
+
+export const updateFirestoreDocument = (collection, documentId, data) =>
+  patch(`${FIREBASE_ENDPOINTS.firestoreRoot}/${collection}/${documentId}`, { data });
+
+export const deleteFirestoreDocument = (collection, documentId) =>
+  del(`${FIREBASE_ENDPOINTS.firestoreRoot}/${collection}/${documentId}`);
+
+export const queryFirestoreCollection = (collection, conditions) =>
+  post(`${FIREBASE_ENDPOINTS.firestoreRoot}/${collection}/query`, { conditions });
+
+// Firebase Realtime Database API
+export const setRealtimeData = (path, data) =>
+  post(`${FIREBASE_ENDPOINTS.realtimeRoot}/${path}`, { data });
+
+export const getRealtimeData = (path) =>
+  get(`${FIREBASE_ENDPOINTS.realtimeRoot}/${path}`);
+
+export const updateRealtimeData = (path, updates) =>
+  patch(`${FIREBASE_ENDPOINTS.realtimeRoot}/${path}`, { updates });
+
+export const deleteRealtimeData = (path) =>
+  del(`${FIREBASE_ENDPOINTS.realtimeRoot}/${path}`);
+
+// Firebase Analytics API
+export const logAnalyticsEvent = (eventName, eventData) =>
+  post(FIREBASE_ENDPOINTS.analyticsLog, { eventName, eventData });
+
+// Firebase Health Check
+export const checkFirebaseHealth = () => get(FIREBASE_ENDPOINTS.health);
 
 export const toApiFileUrl = (relativePath) =>
   relativePath ? `${resolveApiOrigin()}${relativePath}` : null;
 
 export const fetchProtectedFileBlob = async (protectedPath) => {
   const normalizedPath = normalizeProtectedApiPath(protectedPath);
-  return api.get(normalizedPath, { responseType: "blob" });
+  return blobGet(normalizedPath);
 };
 
 const readBlobTextSafely = async (blobLike) => {
@@ -222,43 +269,6 @@ export const downloadProtectedFile = async (
 
   setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
 };
-
-// Firebase Firestore API
-export const setFirestoreDocument = (collection, documentId, data) =>
-  api.post(`/firebase/firestore/${collection}`, { documentId, data });
-
-export const getFirestoreDocument = (collection, documentId) =>
-  api.get(`/firebase/firestore/${collection}/${documentId}`);
-
-export const updateFirestoreDocument = (collection, documentId, data) =>
-  api.patch(`/firebase/firestore/${collection}/${documentId}`, { data });
-
-export const deleteFirestoreDocument = (collection, documentId) =>
-  api.delete(`/firebase/firestore/${collection}/${documentId}`);
-
-export const queryFirestoreCollection = (collection, conditions) =>
-  api.post(`/firebase/firestore/${collection}/query`, { conditions });
-
-// Firebase Realtime Database API
-export const setRealtimeData = (path, data) =>
-  api.post(`/firebase/realtime/${path}`, { data });
-
-export const getRealtimeData = (path) =>
-  api.get(`/firebase/realtime/${path}`);
-
-export const updateRealtimeData = (path, updates) =>
-  api.patch(`/firebase/realtime/${path}`, { updates });
-
-export const deleteRealtimeData = (path) =>
-  api.delete(`/firebase/realtime/${path}`);
-
-// Firebase Analytics API
-export const logAnalyticsEvent = (eventName, eventData) =>
-  api.post('/firebase/analytics/log', { eventName, eventData });
-
-// Firebase Health Check
-export const checkFirebaseHealth = () =>
-  api.get('/firebase/health');
 
 export { resolveApiOrigin };
 

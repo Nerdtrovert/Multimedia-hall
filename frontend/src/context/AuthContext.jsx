@@ -1,87 +1,23 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import api from '../utils/api';
 import {
+  clearStoredAuthSession,
+  getStoredAuthSession,
+  persistStoredAuthSession,
+  normalizeStoredAuthUser,
+} from '../utils/authSession';
+import {
   disablePushNotifications,
   enablePushNotifications,
   isRunningInstalledApp,
 } from '../utils/pushNotifications';
-import { stripRepSuffix } from '../utils/displayName';
 
 const AuthContext = createContext(null);
-const AUTH_STORAGE_KEY = 'auth_session';
-const LEGACY_USER_STORAGE_KEY = 'user';
-const LEGACY_TOKEN_STORAGE_KEY = 'token';
 const PWA_REMEMBER_TTL_MS = 28 * 24 * 60 * 60 * 1000;
 const BROWSER_REMEMBER_TTL_MS = 10 * 60 * 1000;
 
-const normalizeUser = (user) => {
-  if (!user) return user;
-  return {
-    ...user,
-    name: stripRepSuffix(user.name),
-  };
-};
-
-const clearStoredAuth = () => {
-  localStorage.removeItem(AUTH_STORAGE_KEY);
-  localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY);
-  localStorage.removeItem(LEGACY_USER_STORAGE_KEY);
-};
-
 const getRememberMeTtl = () =>
   isRunningInstalledApp() ? PWA_REMEMBER_TTL_MS : BROWSER_REMEMBER_TTL_MS;
-
-const readStoredAuth = () => {
-  try {
-    const rawAuth = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!rawAuth) {
-      clearStoredAuth();
-      return { token: null, user: null, rememberMe: false };
-    }
-    const parsedAuth = JSON.parse(rawAuth);
-    const now = Date.now();
-    const isExpired = !parsedAuth?.expiresAt || parsedAuth.expiresAt <= now;
-    const hasPayload = parsedAuth?.token && parsedAuth?.user;
-
-    if (isExpired || !hasPayload) {
-      clearStoredAuth();
-      return { token: null, user: null, rememberMe: false };
-    }
-
-    const normalizedUser = normalizeUser(parsedAuth.user);
-    if (normalizedUser?.role === 'supervisor') {
-      clearStoredAuth();
-      return { token: null, user: null, rememberMe: false };
-    }
-
-    return {
-      token: parsedAuth.token,
-      user: normalizedUser,
-      rememberMe: Boolean(parsedAuth.rememberMe),
-    };
-  } catch {
-    clearStoredAuth();
-    return { token: null, user: null, rememberMe: false };
-  }
-};
-
-const persistAuth = ({ token, user, rememberMe }) => {
-  if (!rememberMe || !token || !user) {
-    clearStoredAuth();
-    return;
-  }
-
-  const expiresAt = Date.now() + getRememberMeTtl();
-  localStorage.setItem(
-    AUTH_STORAGE_KEY,
-    JSON.stringify({
-      token,
-      user: normalizeUser(user),
-      rememberMe: true,
-      expiresAt,
-    })
-  );
-};
 
 const preloadRoutes = (role) => {
   if (role === 'admin') {
@@ -117,7 +53,7 @@ const preloadRoutes = (role) => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const initialAuth = readStoredAuth();
+  const initialAuth = getStoredAuthSession() || { token: null, user: null, rememberMe: false };
 
   const [user, setUser] = useState(() => initialAuth.user);
   const [token, setToken] = useState(() => initialAuth.token);
@@ -195,9 +131,9 @@ export const AuthProvider = ({ children }) => {
   const fetchMe = async (backgroundRefresh = false) => {
     try {
       const res = await api.get('/auth/me');
-      const normalizedUser = normalizeUser(res.data);
+      const normalizedUser = normalizeStoredAuthUser(res.data);
       setUser(normalizedUser);
-      persistAuth({ token, user: normalizedUser, rememberMe });
+      persistStoredAuthSession({ token, user: normalizedUser, rememberMe, ttlMs: getRememberMeTtl() });
       preloadRoutes(normalizedUser.role);
     } catch {
       logout();
@@ -211,11 +147,16 @@ export const AuthProvider = ({ children }) => {
   const performLogin = async (payload, endpoint = '/auth/login', shouldRememberMe = false) => {
     const res = await api.post(endpoint, payload);
     const { token: newToken, user: rawUserData } = res.data;
-    const userData = normalizeUser(rawUserData);
+    const userData = normalizeStoredAuthUser(rawUserData);
     setToken(newToken);
     setUser(userData);
     setRememberMe(shouldRememberMe);
-    persistAuth({ token: newToken, user: userData, rememberMe: shouldRememberMe });
+    persistStoredAuthSession({
+      token: newToken,
+      user: userData,
+      rememberMe: shouldRememberMe,
+      ttlMs: getRememberMeTtl(),
+    });
     setLoading(false);
 
     preloadRoutes(userData.role);
@@ -231,7 +172,7 @@ export const AuthProvider = ({ children }) => {
     disablePushNotifications().catch((err) => {
       console.error('Push notification cleanup failed:', err);
     });
-    clearStoredAuth();
+    clearStoredAuthSession();
     setToken(null);
     setUser(null);
     setRememberMe(false);
