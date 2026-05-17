@@ -19,6 +19,11 @@ const { getFrontendOrigins, getMissingRequiredEnv } = require('./config/env');
 const db = require('./config/db');
 
 const app = express();
+if (process.env.TRUST_PROXY === 'true') {
+  // When running behind a proxy/load-balancer that terminates TLS, enable this
+  // so req.protocol and req.get('host') reflect the public origin.
+  app.set('trust proxy', true);
+}
 const frontendOrigins = getFrontendOrigins();
 
 const compression = require('compression');

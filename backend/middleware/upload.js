@@ -12,26 +12,31 @@ const posterDir = path.join(uploadsRoot, 'posters');
 
 const imageMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/jpg']);
 
-const uploadPoster = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (!imageMimeTypes.has(file.mimetype)) {
-      return cb(new Error('Poster must be JPG, PNG, or WEBP image.'));
-    }
-    cb(null, true);
-  },
+// Helper to create multer uploaders with consistent memory storage and error handling
+const createUploader = ({ fileSizeLimit, validateFn, errorMessage }) =>
+  multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: fileSizeLimit },
+    fileFilter: (req, file, cb) => {
+      try {
+        if (!validateFn(file)) return cb(new Error(errorMessage));
+        cb(null, true);
+      } catch (err) {
+        cb(err);
+      }
+    },
+  });
+
+const uploadPoster = createUploader({
+  fileSizeLimit: 5 * 1024 * 1024,
+  validateFn: (file) => imageMimeTypes.has(file.mimetype),
+  errorMessage: 'Poster must be JPG, PNG, or WEBP image.',
 });
 
-const uploadReport = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype !== 'application/pdf') {
-      return cb(new Error('Event report must be a PDF file.'));
-    }
-    cb(null, true);
-  },
+const uploadReport = createUploader({
+  fileSizeLimit: 10 * 1024 * 1024,
+  validateFn: (file) => file.mimetype === 'application/pdf',
+  errorMessage: 'Event report must be a PDF file.',
 });
 
 module.exports = { uploadPoster, uploadReport };

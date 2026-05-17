@@ -4,8 +4,7 @@ const toDateTime = (dateValue, timeValue = '00:00:00') => {
   const datePart = toDatePart(dateValue);
   const safeTime = String(timeValue || '00:00:00').slice(0, 8) || '00:00:00';
   if (!datePart) return null;
-
-  const parsed = new Date(`${datePart}T${safeTime}`);
+  const parsed = new Date(`${datePart}T${safeTime}`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
@@ -25,16 +24,18 @@ export const isBookingStillActive = (booking, now = new Date()) => {
   return !!eventEnd && eventEnd.getTime() >= now.getTime();
 };
 
+// Utility to ensure callers can treat inputs as arrays without repeating checks
+const ensureArray = (value) => (Array.isArray(value) ? value : []);
+
 export const getRecentApprovedBookings = (bookings, limit = 10, now = new Date()) =>
-  (Array.isArray(bookings) ? bookings : [])
+  ensureArray(bookings)
     .filter((booking) => booking?.status === 'approved')
     .filter((booking) => isBookingStillActive(booking, now))
     .sort((a, b) => getSortTimestamp(b) - getSortTimestamp(a))
     .slice(0, limit);
 
 export const getAnnouncementCards = (bookings, now = new Date()) => {
-  const approved = (Array.isArray(bookings) ? bookings : [])
-    .filter((booking) => booking?.status === 'approved');
+  const approved = ensureArray(bookings).filter((booking) => booking?.status === 'approved');
 
   const upcoming = approved
     .filter((booking) => isBookingStillActive(booking, now))
