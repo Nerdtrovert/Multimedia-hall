@@ -27,6 +27,36 @@ const ensureUsernameUniqueIndex = async () => {
   }
 };
 
+const ensureCancellationReasonColumn = async () => {
+  try {
+    await db.query('ALTER TABLE bookings ADD COLUMN cancellation_reason TEXT');
+  } catch (error) {
+    if (!isIgnorableMigrationError(error, ['ER_DUP_FIELDNAME'])) {
+      throw error;
+    }
+  }
+};
+
+const ensureCancelledAtColumn = async () => {
+  try {
+    await db.query('ALTER TABLE bookings ADD COLUMN cancelled_at TIMESTAMP NULL');
+  } catch (error) {
+    if (!isIgnorableMigrationError(error, ['ER_DUP_FIELDNAME'])) {
+      throw error;
+    }
+  }
+};
+
+const ensureCancelledStatus = async () => {
+  try {
+    await db.query("ALTER TABLE bookings MODIFY COLUMN status ENUM('pending', 'approved', 'rejected', 'cancelled') DEFAULT 'pending'");
+  } catch (error) {
+    if (!isIgnorableMigrationError(error, ['ER_DUP_FIELDNAME', 'ER_PARSE_ERROR'])) {
+      throw error;
+    }
+  }
+};
+
 const seed = async () => {
   try {
     await db.query(
@@ -34,6 +64,9 @@ const seed = async () => {
     );
     await ensureUsernameColumn();
     await ensureUsernameUniqueIndex();
+    await ensureCancellationReasonColumn();
+    await ensureCancelledAtColumn();
+    await ensureCancelledStatus();
 
     const adminPass = await bcrypt.hash('admin123', 10);
     const collegePass = await bcrypt.hash('college123', 10);

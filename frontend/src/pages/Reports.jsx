@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { downloadPDF, downloadExcel, downloadActionLogs } from "../utils/api";
+import { extractBlobErrorMessage, triggerBlobDownload } from "../utils/downloadHelpers";
 import { toast } from "react-toastify";
 import Navbar from "../components/common/Navbar";
 import PageBackButton from "../components/common/PageBackButton";
@@ -12,7 +13,7 @@ const EXPORT_TYPES = [
     key: "pdf",
     label: "📄 Download PDF",
     api: downloadPDF,
-    filename: () => "bookings_report.pdf",
+    filename: () => `bookings-report-${new Date().toISOString().slice(0, 10)}.pdf`,
   },
   {
     key: "excel",
@@ -44,7 +45,7 @@ const Reports = () => {
       ? "/admin/dashboard"
       : "/user/dashboard";
 
-  const [filters, setFilters] = useState({ college: "", from: "", to: "" });
+  const [filters, setFilters] = useState({ college: "", status: "", from: "", to: "" });
   const [loading, setLoading] = useState({});
 
   const handleChange = (e) =>
@@ -55,22 +56,19 @@ const Reports = () => {
     try {
       const params = key === "logs" ? undefined : activeFilters(filters);
       const res = await api(params);
-      const url = URL.createObjectURL(res.data);
-      Object.assign(document.createElement("a"), {
-        href: url,
-        download: filename(),
-      }).click();
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(res.data, filename());
       toast.success(`${key.toUpperCase()} downloaded successfully!`);
-    } catch {
-      toast.error(`Failed to download ${key.toUpperCase()} report.`);
+    } catch (error) {
+      const fallbackMessage = `Failed to download ${key.toUpperCase()} report.`;
+      toast.error(await extractBlobErrorMessage(error, fallbackMessage));
     } finally {
       setLoading((prev) => ({ ...prev, [key]: false }));
     }
   };
 
-  const visibleExports = EXPORT_TYPES.filter(
-    (t) => !t.supervisorOnly || isSupervisor,
+  const visibleExports = useMemo(
+    () => EXPORT_TYPES.filter((t) => !t.supervisorOnly || isSupervisor),
+    [isSupervisor],
   );
 
   return (
@@ -108,6 +106,22 @@ const Reports = () => {
                         {name}
                       </option>
                     ))}
+                  </select>
+                </div>
+              )}
+
+              {isAdmin && (
+                <div className="form-group">
+                  <label>Status</label>
+                  <select
+                    name="status"
+                    value={filters.status}
+                    onChange={handleChange}
+                    className="input"
+                  >
+                    <option value="">All</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
                   </select>
                 </div>
               )}

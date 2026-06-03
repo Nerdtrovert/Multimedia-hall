@@ -12,17 +12,36 @@ const getFrontendOrigins = () => {
     return configuredOrigins;
   }
 
-  return ['http://localhost:3000'];
+  return [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ];
 };
 
-const getPrimaryFrontendUrl = () => getFrontendOrigins()[0];
+const getPrimaryFrontendUrl = () => {
+  const origins = getFrontendOrigins();
+  const publicOrigin = origins.find(
+    (origin) => !origin.includes('localhost') && !origin.includes('127.0.0.1')
+  );
+  return publicOrigin || origins[0] || '';
+};
+
+const getBackendOrigins = () => parseOriginList(process.env.BACKEND_URL);
+
+const getPrimaryBackendUrl = () => getBackendOrigins()[0] || '';
 
 const getMissingRequiredEnv = () =>
   ['JWT_SECRET']
     .filter((key) => !String(process.env[key] || '').trim());
 
 module.exports = {
+  normalizeUrl,
+  parseOriginList,
   getFrontendOrigins,
   getPrimaryFrontendUrl,
+  getBackendOrigins,
+  getPrimaryBackendUrl,
   getMissingRequiredEnv,
 };

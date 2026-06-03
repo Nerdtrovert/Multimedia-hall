@@ -5,7 +5,7 @@ import {
   toApiFileUrl,
   uploadEventReport
 } from '../../utils/api';
-import { openReport, downloadReport } from '../../utils/fileHelpers';
+import { getReportDownloadRoute, getReportViewRoute } from '../../utils/fileHelpers';
 import Navbar from '../../components/common/Navbar';
 import PageBackButton from '../../components/common/PageBackButton';
 import StatusBadge from '../../components/common/StatusBadge';
@@ -29,6 +29,7 @@ const MyBookings = () => {
   const [uploadingBookingId, setUploadingBookingId] = useState(null);
   const [cancellingBookingId, setCancellingBookingId] = useState(null);
   const [cancelModalBooking, setCancelModalBooking] = useState(null);
+  const [cancellationReason, setCancellationReason] = useState('');
 
   const fetchBookings = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -47,7 +48,7 @@ const MyBookings = () => {
   useAutoRefresh(() => fetchBookings(false), 10000);
 
   const canUploadReport = (booking) => {
-    if (booking.status !== 'approved') return false;
+    if (!['approved', 'concluded'].includes(booking.status)) return false;
 
     const datePart = toDateKey(booking.event_date);
     const endPart = String(booking.end_time || '').slice(0, 8);
@@ -55,6 +56,16 @@ const MyBookings = () => {
 
     if (Number.isNaN(eventEnd.getTime())) return false;
     return new Date() >= eventEnd;
+  };
+
+  const canCancelBooking = (booking) => {
+    if (booking.status === 'concluded') return false;
+    const datePart = toDateKey(booking.event_date);
+    const endPart = String(booking.end_time || '').slice(0, 8);
+    const eventEnd = new Date(`${datePart}T${endPart}`);
+
+    if (Number.isNaN(eventEnd.getTime())) return true;
+    return new Date() < eventEnd;
   };
 
   const handleReportFileChange = (bookingId, file) => {
@@ -90,15 +101,23 @@ const MyBookings = () => {
   const closeCancelModal = () => {
     if (cancellingBookingId) return;
     setCancelModalBooking(null);
+    setCancellationReason('');
   };
 
   const cancelRequest = async () => {
     if (!cancelModalBooking) return;
+    
+    if (!cancellationReason.trim()) {
+      toast.error('Please provide a reason for cancellation.');
+      return;
+    }
+
     setCancellingBookingId(cancelModalBooking.id);
     try {
-      await cancelBookingRequest(cancelModalBooking.id);
+      await cancelBookingRequest(cancelModalBooking.id, cancellationReason);
       toast.success('Booking request cancelled.');
       setCancelModalBooking(null);
+      setCancellationReason('');
       await fetchBookings(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to cancel booking request.');
@@ -194,20 +213,22 @@ const MyBookings = () => {
   <div style={{ display: 'grid', gap: 6 }}>
     {b.event_report_url ? (
       <div style={{ display: 'grid', gap: 6 }}>
-        <button
-          type="button"
+        <a
+          href={getReportViewRoute(b)}
           className="link-btn"
-          onClick={() => openReport(b)}
+          target="_blank"
+          rel="noopener noreferrer"
         >
           View report
-        </button>
-        <button
-          type="button"
+        </a>
+        <a
+          href={getReportDownloadRoute(b)}
           className="link-btn"
-          onClick={() => downloadReport(b)}
+          target="_blank"
+          rel="noopener noreferrer"
         >
           Download report
-        </button>
+        </a>
       </div>
     ) : (
       <span style={{ color: '#9ca3af' }}>No report</span>
@@ -237,7 +258,7 @@ const MyBookings = () => {
             : 'Upload report'}
         </button>
       </div>
-    ) : b.status === 'approved' ? (
+    ) : ['approved', 'concluded'].includes(b.status) ? (
       <span style={{ color: '#9ca3af', fontSize: 12 }}>
         Upload enabled after event ends.
       </span>
@@ -250,7 +271,7 @@ const MyBookings = () => {
 </td>
 
 <td>
-  {b.status === 'pending' ? (
+  {['pending', 'approved'].includes(b.status) && b.status !== 'cancelled' && canCancelBooking(b) ? (
     <button
       type="button"
       className="btn-secondary"
@@ -287,6 +308,28 @@ const MyBookings = () => {
             <p>
               Cancel <strong>{cancelModalBooking.title}</strong>? This cannot be undone.
             </p>
+            <div style={{ marginBottom: 16 }}>
+              <label htmlFor="cancel-reason" style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
+                Reason for cancellation <span style={{ color: 'red' }}>*</span>
+              </label>
+              <textarea
+                id="cancel-reason"
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder="Please provide a reason for cancelling this booking..."
+                disabled={Boolean(cancellingBookingId)}
+                style={{
+                  width: '100%',
+                  padding: 10,
+                  minHeight: 80,
+                  borderRadius: 4,
+                  border: '1px solid #d1d5db',
+                  fontFamily: 'inherit',
+                  fontSize: 14,
+                  resize: 'vertical',
+                }}
+              />
+            </div>
             <div className="modal-actions">
               <button
                 type="button"
@@ -300,7 +343,7 @@ const MyBookings = () => {
                 type="button"
                 className="btn btn-primary"
                 onClick={cancelRequest}
-                disabled={Boolean(cancellingBookingId)}
+                disabled={Boolean(cancellingBookingId) || !cancellationReason.trim()}
               >
                 {cancellingBookingId ? 'Cancelling...' : 'Confirm cancellation'}
               </button>

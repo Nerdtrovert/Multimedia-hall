@@ -28,8 +28,14 @@ if (hasFirebaseConfig) {
   const messaging = getMessaging(app);
 
   onBackgroundMessage(messaging, (payload) => {
-    const title = payload.notification?.title || 'Auditorium Booking System';
-    const body = payload.notification?.body || '';
+    // If the message already contains a notification object, the FCM SDK displays it automatically.
+    // We exit early here to prevent duplicate notifications in the background.
+    if (payload.notification) {
+      return;
+    }
+
+    const title = payload.data?.title || 'Auditorium Booking System';
+    const body = payload.data?.body || '';
     self.registration.showNotification(title, {
       body,
       icon: '/icons/icon-192.png',

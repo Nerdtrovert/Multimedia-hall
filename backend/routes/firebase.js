@@ -14,6 +14,8 @@ const {
 } = require('../utils/firebaseUtils');
 const { authenticate } = require('../middleware/auth');
 
+const { logAudit } = require('../utils/audit');
+
 const router = express.Router();
 
 // Health check
@@ -23,6 +25,56 @@ router.get('/health', (req, res) => {
     firebaseConfigured: isPushConfigured(),
     timestamp: new Date(),
   });
+});
+
+// Test-send endpoint: send a test notification to a saved userId or a direct token
+router.post('/test-send', authenticate, async (req, res) => {
+  const { userId, token, title, body, link } = req.body || {};
+  if (!userId && !token) {
+    return res.status(400).json({ message: 'Provide userId or token in request body.' });
+  }
+
+  const payload = {
+    title: title || 'Test notification',
+    body: body || 'This is a test notification sent from server.',
+    link: link || '/',
+    data: { test: '1', link: link || '/' },
+  };
+
+  try {
+    if (token) {
+      const { getMessaging } = require('../utils/firebaseUtils');
+      const messaging = getMessaging();
+      if (!messaging) return res.status(500).json({ message: 'Firebase Admin not configured.' });
+
+      const message = {
+        token,
+        notification: { title: payload.title, body: payload.body },
+        data: payload.data,
+        webpush: {
+          notification: { icon: '/icons/icon-192.png', badge: '/icons/icon-192.png' },
+          fcmOptions: { link: payload.link },
+        },
+      };
+
+      const result = await messaging.send(message);
+      return res.json({ message: 'Sent', result });
+    }
+
+    // send to userId by reusing pushNotifications helper
+    const { sendPushToUser } = require('../utils/pushNotifications');
+    const result = await sendPushToUser(userId, {
+      title: payload.title,
+      body: payload.body,
+      link: payload.link,
+      data: payload.data,
+    });
+
+    return res.json({ message: 'Queued', result });
+  } catch (err) {
+    console.error('Test send error:', err);
+    return res.status(500).json({ message: err.message || 'Failed to send test notification.' });
+  }
 });
 
 // Firestore endpoints
@@ -201,6 +253,28 @@ router.post('/analytics/log', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Error in POST /analytics/log:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Diagnostic endpoint for client push registration attempts
+router.post('/diagnostic', authenticate, async (req, res) => {
+  const { event, token, message } = req.body || {};
+  const userId = req.user?.id || null;
+
+  try {
+    const shortToken = token ? String(token).slice(0, 16) : null;
+    const details = `event=${event || 'unknown'} token=${shortToken || 'none'} message=${String(message || '').slice(0,200)}`;
+    // non-blocking audit log
+    try {
+      logAudit('PUSH_DIAGNOSTIC', userId, null, details);
+    } catch (e) {
+      console.error('Failed to write diagnostic audit:', e);
+    }
+
+    return res.status(201).json({ message: 'Diagnostic logged' });
+  } catch (err) {
+    console.error('Diagnostic endpoint error:', err);
+    return res.status(500).json({ message: 'Failed to log diagnostic' });
   }
 });
 

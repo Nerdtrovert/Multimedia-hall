@@ -8,12 +8,12 @@
 
 /* BRANDING HEADER STYLES */
 .branding-header {
-  color: #1a237e; /* Navy blue */
+  color: var(--primary);
 }
 
-/* Dark blue top strip */
+/* Dark orange top strip -> Navy strip */
 .navy-strip {
-  background-color: #1a237e;
+  background-color: var(--primary);
   color: white;
   display: flex;
   justify-content: space-between;
@@ -24,7 +24,7 @@
 }
 
 .erp-login-btn {
-    background-color: #f78117; /* Bright orange */
+    background-color: var(--accent);
     padding: 6px 18px;
     border-radius: 4px;
     font-weight: 700;
@@ -65,7 +65,7 @@
 .founder-image { 
     height: 100px; 
     border-radius: 50%; /* Rounded crop from image */
-    border: 3px solid #1a237e; 
+    border: 3px solid var(--primary); 
 }
 .founder-caption { font-size: 0.75rem; text-align: center; font-weight: 600; margin-top: 5px; }
 .award-text { font-weight: bold; color: #555; }
@@ -73,7 +73,7 @@
 
 /* NAVIGATION LINKS BAR (Generic Links) */
 .nav-links-bar {
-  background-color: #1a237e; /* Standard navy */
+  background-color: var(--primary);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -94,7 +94,7 @@
 }
 
 .links-left a:hover {
-  color: #f78117; /* Highlight hover in orange */
+  color: var(--accent);
 }
 
 .links-right {
@@ -106,7 +106,7 @@
 .welcome-username { margin-right: 15px; font-size: 0.9rem; }
 
 .logout-btn {
-  background-color: #f78117;
+  background-color: var(--accent);
   color: white;
   border: none;
   padding: 8px 20px;
@@ -118,14 +118,14 @@
 
 .logout-btn:hover {
     background-color: white;
-    color: #f78117;
+    color: var(--accent);
 }
 /* ─── Navbar Container ───────────────────────── */
 .navbar {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  background: #1e3a8a; /* 🔵 Blue navbar */
+  background: var(--primary); /* Navy navbar */
   color: white;
   padding: 12px 24px;
   min-height: 70px;
@@ -215,7 +215,7 @@
 /* Active */
 .navbar-links a.active {
   background: white;
-  color: #1e3a8a;
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -252,19 +252,19 @@
 
 /* Admin = orange */
 .role-badge.admin {
-  background: rgba(249, 115, 22, 0.2);
-  color: #fed7aa;
+  background: rgba(234, 88, 12, 0.2); /* Orange tint */
+  color: var(--accent);
 }
 
-/* College = light blue */
+/* College = light warm */
 .role-badge.college {
   background: rgba(255, 255, 255, 0.2);
-  color: #e0f2fe;
+  color: #ffedd5;
 }
 
 /* ─── Logout Button ───────────────────────── */
 .btn-logout {
-  background: #f97316;
+  background: var(--accent);
   color: white;
   padding: 8px 16px;
   font-size: 13px;
@@ -275,7 +275,7 @@
 }
 
 .btn-logout:hover {
-  background: #ea580c;
+  background: var(--accent-light);
 }
 
 /* ─── Responsive ───────────────────────── */

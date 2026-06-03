@@ -173,6 +173,22 @@ const sendBookingStatusPush = async (userId, booking, status) => {
   });
 };
 
+const sendBookingCancellationAdminPush = async (adminUserIds, booking, requester, cancellationReason) => {
+  return sendPushToUsers(adminUserIds, {
+    title: 'Booking cancelled',
+    body: `${requester.name || booking.college_name} cancelled "${booking.title}" scheduled for ${new Date(
+      booking.event_date
+    ).toDateString()}.`,
+    link: '/admin/requests',
+    data: {
+      type: 'booking_cancelled',
+      bookingId: booking.id,
+      cancelledBy: requester.id || '',
+      cancellationReason: cancellationReason || '',
+    },
+  });
+};
+
 const sendPostReportReminderPush = async (userId, booking) => {
   return sendPushToUser(userId, {
     title: 'Post-event report reminder',
@@ -200,8 +216,12 @@ module.exports = {
   ensurePushTokenTable,
   saveUserPushToken,
   removeUserPushToken,
+  getUserPushTokens,
+  sendPushToUser,
+  sendPushToUsers,
   sendNewBookingRequestPush,
   sendBookingStatusPush,
+  sendBookingCancellationAdminPush,
   sendPostReportReminderPush,
   sendPasswordResetPush,
 };

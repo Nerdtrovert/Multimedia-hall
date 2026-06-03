@@ -127,38 +127,45 @@ const NewBooking = () => {
     loadBookings();
   }, []);
 
-  const bookedRanges = form.event_date
-    ? bookingsByDate[form.event_date] || []
-    : [];
+  const bookedRanges = useMemo(
+    () => (form.event_date ? bookingsByDate[form.event_date] || [] : []),
+    [bookingsByDate, form.event_date],
+  );
   const isTodaySelection = form.event_date === today;
 
-  const startOptions = timeSlots.slice(0, -1).map((time) => {
-    const startMinutes = toMinutes(time);
-    const endMinutes = startMinutes + TIME_STEP;
+  const startOptions = useMemo(
+    () =>
+      timeSlots.slice(0, -1).map((time) => {
+        const startMinutes = toMinutes(time);
+        const endMinutes = startMinutes + TIME_STEP;
 
-    return {
-      value: time,
-      disabled:
-        (isTodaySelection && startMinutes <= currentMinutes) ||
-        hasOverlap(startMinutes, endMinutes, bookedRanges),
-    };
-  });
+        return {
+          value: time,
+          disabled:
+            (isTodaySelection && startMinutes <= currentMinutes) ||
+            hasOverlap(startMinutes, endMinutes, bookedRanges),
+        };
+      }),
+    [bookedRanges, currentMinutes, isTodaySelection, timeSlots],
+  );
 
-  const endOptions = timeSlots.slice(1).map((time) => {
-    const endMinutes = toMinutes(time);
-    const startMinutes = form.start_time
-      ? toMinutes(form.start_time)
-      : null;
+  const endOptions = useMemo(
+    () =>
+      timeSlots.slice(1).map((time) => {
+        const endMinutes = toMinutes(time);
+        const startMinutes = form.start_time ? toMinutes(form.start_time) : null;
 
-    return {
-      value: time,
-      disabled:
-        !form.start_time ||
-        (isTodaySelection && endMinutes <= currentMinutes) ||
-        endMinutes <= startMinutes ||
-        hasOverlap(startMinutes, endMinutes, bookedRanges),
-    };
-  });
+        return {
+          value: time,
+          disabled:
+            !form.start_time ||
+            (isTodaySelection && endMinutes <= currentMinutes) ||
+            endMinutes <= startMinutes ||
+            hasOverlap(startMinutes, endMinutes, bookedRanges),
+        };
+      }),
+    [bookedRanges, currentMinutes, form.start_time, isTodaySelection, timeSlots],
+  );
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;

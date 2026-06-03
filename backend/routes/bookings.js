@@ -23,7 +23,7 @@ router.post('/', authenticate, authorizeCollege, uploadPoster.single('poster'), 
 router.get('/my', authenticate, authorizeCollege, getMyBookings);
 router.delete('/:id', authenticate, authorizeCollege, cancelMyBooking);
 router.post('/:id/report', authenticate, authorizeCollege, uploadReport.single('event_report'), uploadEventReport);
-router.get('/:id/report', authenticate, getEventReport);
+router.get('/:id/report', getEventReport);
 router.get('/:id/poster', getPoster);
 
 // Admin routes

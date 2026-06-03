@@ -33,3 +33,17 @@
   color: #dc2626;
   border-color: #fecaca;
 }
+
+/* Cancelled → Gray */
+.status-badge.cancelled {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+/* Concluded → Premium Indigo/Slate */
+.status-badge.concluded {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4f46e5;
+  border-color: rgba(99, 102, 241, 0.2);
+}

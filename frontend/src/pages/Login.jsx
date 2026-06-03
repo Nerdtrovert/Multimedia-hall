@@ -4,6 +4,46 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import './Login.css';
 
+const PasswordToggleIcon = ({ visible }) => (
+  visible ? (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M3 3l18 18"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M2.5 12s3.5-6.5 9.5-6.5c1.3 0 2.5.2 3.6.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M21.5 12s-3.5 6.5-9.5 6.5c-1.3 0-2.5-.2-3.6-.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+);
+
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -46,10 +86,6 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handlePasswordTogglePointerDown = (e) => {
-    e.preventDefault();
   };
 
   return (
@@ -115,13 +151,11 @@ const Login = () => {
                   <button
                     type="button"
                     className="password-toggle"
-                    onMouseDown={handlePasswordTogglePointerDown}
-                    onPointerDown={handlePasswordTogglePointerDown}
                     onClick={() => setShowPassword((value) => !value)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     aria-pressed={showPassword}
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    <PasswordToggleIcon visible={showPassword} />
                   </button>
                 </div>
               </div>

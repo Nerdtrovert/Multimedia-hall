@@ -5,7 +5,11 @@ import App from './App';
 import './index.css';
 import { initializeFirebase } from './utils/firebaseClient';
 
-registerSW({ immediate: true });
+// Register Service Worker for PWA (supported in prod, and in dev when devOptions is enabled in vite.config.js)
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  registerSW({ immediate: true });
+}
+
 
 // Initialize Firebase
 initializeFirebase().then((initialized) => {

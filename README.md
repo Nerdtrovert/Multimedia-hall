@@ -150,7 +150,8 @@ audit_logs
 
 - Set `JWT_SECRET` explicitly in production. The backend will not boot without it.
 - `FRONTEND_URL` supports a single origin or a comma-separated allowlist.
-- Poster and report links in exports use API routes now, so they continue to work for database-backed files.
+- Mail buttons can be customized with `MAIL_LOGIN_URL`, `MAIL_DASHBOARD_URL`, `MAIL_ADMIN_URL`, and `MAIL_BOOKINGS_URL`; each falls back to `FRONTEND_URL` if unset.
+- Poster and report links in exports point to frontend file routes that redirect to public file endpoints.
 - New uploads are stored in MySQL; `backend/uploads/` remains only as a backward-compatible fallback for older rows.
 
 ---
@@ -260,7 +261,9 @@ POST_REPORT_REMINDER_RUN_ON_STARTUP=false
 ### Frontend (`frontend/.env`)
 
 ```env
+# Use a relative path in local Vite dev so the proxy forwards requests to the backend.
 VITE_API_BASE_URL=/api
+VITE_BACKEND_PROXY_TARGET=http://localhost:5000
 VITE_FIREBASE_API_KEY=
 VITE_FIREBASE_AUTH_DOMAIN=
 VITE_FIREBASE_PROJECT_ID=

@@ -1,26 +1,41 @@
-import './AboutDevelopers.css';
+import "./AboutDevelopers.css";
 
 const developers = [
   {
-    name: 'Aarav Kumar',
-    usn: '1BV23CS001',
-    points: ['Frontend layout and UI cleanup', 'Integrated routing for new pages', 'Handled responsive behavior fixes']
+    name: "Prajwal Navada G P",
+    usn: "1HC24CS058",
+    // photo: "/developers/prajwal.jpg",
+    points: [
+      "Seamless frontend-backend routing with reliable database connectivity",
+      "PWA implementation with push notifications and mailing integration",
+      "Calendar module fixes with overall system enhancements",
+    ],
   },
   {
-    name: 'Ishita Reddy',
-    usn: '1BV23CS014',
-    points: ['Worked on booking flow enhancements', 'Improved form validation handling', 'Documented component usage notes']
+    name: "Meenal Lepakshi",
+    usn: "1HC24AD016",
+    // photo: "/developers/meenal.jpg",
+    points: [
+      "Added login UI with background & logo",
+      "Fixed calendar styling and auth flow",
+      "Resolved merge conflicts",
+    ],
   },
   {
-    name: 'Nikhil Shetty',
-    usn: '1BV23CS027',
-    points: ['API integration and data wiring', 'Refined dashboard data rendering', 'Optimized repeated utility usage']
+    name: "Pruthvi Raj G",
+    usn: "1HC24CS000",
+    // photo: "/developers/pruthvi.jpg",
+    points: [
+      "Navbar inclusion with Name and logo",
+      "Report generation in Excel",
+    ],
   },
   {
-    name: 'Meghana Rao',
-    usn: '1BV23CS039',
-    points: ['Reports page updates and polish', 'Assisted with QA and testing scenarios', 'Coordinated release-ready checks']
-  }
+    name: "Aaron Chirag",
+    usn: "1HC24CS002",
+    // photo: "/developers/aaron.jpg",
+    points: ["Frontend suggestions", "Color scheme suggestions"],
+  },
 ];
 
 function AboutDevelopers() {
@@ -34,7 +49,15 @@ function AboutDevelopers() {
       <div className="about-grid">
         {developers.map((developer) => (
           <article className="about-card card" key={developer.usn}>
-            <div className="about-photo-placeholder">Photo</div>
+            {developer.photo ? (
+              <img 
+                src={developer.photo} 
+                alt={`${developer.name}'s photo`} 
+                className="about-photo"
+              />
+            ) : (
+              <div className="about-photo-placeholder">Photo</div>
+            )}
             <div className="about-details">
               <h3>{developer.name}</h3>
               <p className="about-usn">{developer.usn}</p>

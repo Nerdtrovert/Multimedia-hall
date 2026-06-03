@@ -1,22 +1,32 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getMyBookings } from '../../utils/api';
+import { getMyBookings, getCalendarBookings } from '../../utils/api';
 import Navbar from '../../components/common/Navbar';
-import StatusBadge from '../../components/common/StatusBadge';
+import AnnouncementsSection from '../../components/common/RecentActivitySection';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
+import { getAnnouncementCards } from '../../utils/recentActivity';
 import '../Dashboard.css';
 
 const UserDashboard = () => {
   const { user } = useAuth();
   const [bookings, setBookings] = useState([]);
+  const [commonBookings, setCommonBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchBookings = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
-      const res = await getMyBookings();
-      setBookings(res.data);
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().split('T')[0];
+      const end = new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString().split('T')[0];
+      
+      const [myRes, calendarRes] = await Promise.all([
+        getMyBookings(),
+        getCalendarBookings(start, end),
+      ]);
+      setBookings(myRes.data);
+      setCommonBookings(calendarRes.data || []);
     } finally {
       if (showLoader) setLoading(false);
     }
@@ -28,10 +38,24 @@ const UserDashboard = () => {
 
   useAutoRefresh(() => fetchBookings(false), 10000);
 
-  const pending = bookings.filter((b) => b.status === 'pending').length;
-  const approved = bookings.filter((b) => b.status === 'approved').length;
-  const rejected = bookings.filter((b) => b.status === 'rejected').length;
-  const recent = bookings.slice(0, 5);
+  const bookingSummary = useMemo(
+    () =>
+      bookings.reduce(
+        (summary, booking) => {
+          if (booking.status === 'pending') summary.pending += 1;
+          if (['approved', 'concluded'].includes(booking.status)) summary.approved += 1;
+          if (booking.status === 'rejected') summary.rejected += 1;
+          return summary;
+        },
+        { pending: 0, approved: 0, rejected: 0 },
+      ),
+    [bookings],
+  );
+
+  const recentActivity = useMemo(
+    () => getAnnouncementCards(commonBookings),
+    [commonBookings],
+  );
 
   return (
     <div>
@@ -45,23 +69,23 @@ const UserDashboard = () => {
 
         {/* Stats */}
         <div className="stats-row">
-          <div className="stat-card card">
+          <div className="stat-card card user-stat-card total">
             <div className="stat-number total">{bookings.length}</div>
             <div className="stat-label">Total Requests</div>
           </div>
 
-          <div className="stat-card card">
-            <div className="stat-number pending">{pending}</div>
+          <div className="stat-card card user-stat-card pending">
+            <div className="stat-number pending">{bookingSummary.pending}</div>
             <div className="stat-label">Pending</div>
           </div>
 
-          <div className="stat-card card">
-            <div className="stat-number approved">{approved}</div>
+          <div className="stat-card card user-stat-card approved">
+            <div className="stat-number approved">{bookingSummary.approved}</div>
             <div className="stat-label">Approved</div>
           </div>
 
-          <div className="stat-card card">
-            <div className="stat-number rejected">{rejected}</div>
+          <div className="stat-card card user-stat-card rejected">
+            <div className="stat-number rejected">{bookingSummary.rejected}</div>
             <div className="stat-label">Rejected</div>
           </div>
         </div>
@@ -93,41 +117,15 @@ const UserDashboard = () => {
           </Link>
         </div>
 
-        {/* Recent */}
-        <div className="recent-section card">
-          <h3>Recent Requests</h3>
-
-          {loading ? (
-            <p>Loading...</p>
-          ) : recent.length === 0 ? (
-            <p className="empty-msg">
-              No booking requests yet. <Link to="/user/new-booking">Create one →</Link>
-            </p>
-          ) : (
-            <div className="table-card">
-              <table className="bookings-table">
-                <thead>
-                  <tr>
-                    <th>Title</th>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recent.map((b) => (
-                    <tr key={b.id}>
-                      <td>{b.title}</td>
-                      <td>{new Date(b.event_date).toLocaleDateString('en-GB')}</td>
-                      <td>{b.start_time} – {b.end_time}</td>
-                      <td><StatusBadge status={b.status} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <AnnouncementsSection
+          bookings={recentActivity.all}
+          loading={loading}
+          emptyMessage={
+            <>
+              No announcements right now. <Link to="/user/new-booking">Create one →</Link>
+            </>
+          }
+        />
 
       </div>
     </div>

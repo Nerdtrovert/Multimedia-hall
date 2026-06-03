@@ -1,135 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import {
-  clearActionLogs,
-  downloadActionLogs,
-  getSupervisorResetTargets,
-  supervisorResetOperationalData,
-  supervisorResetUserEmail,
-} from '../../utils/api';
 import Navbar from '../../components/common/Navbar';
+import { useSupervisorMaintenance } from '../../hooks/useSupervisorMaintenance';
 import '../Dashboard.css';
 
 const SupervisorDashboard = () => {
-  const [downloadingLogs, setDownloadingLogs] = useState(false);
-  const [clearingLogs, setClearingLogs] = useState(false);
-  const [resettingDb, setResettingDb] = useState(false);
-  const [emailResetForm, setEmailResetForm] = useState({ username: '', email: '' });
-  const [resetTargets, setResetTargets] = useState([]);
-  const [updatingEmail, setUpdatingEmail] = useState(false);
+  const {
+    downloadingLogs,
+    clearingLogs,
+    resettingDb,
+    emailResetForm,
+    setEmailResetForm,
+    resetTargets,
+    totalUsers,
+    updatingEmail,
+    handleDownloadActionLogs,
+    handleClearActionLogs,
+    handleSupervisorDbReset,
+    handleSupervisorEmailReset,
+  } = useSupervisorMaintenance({
+    prioritizeAdmins: true,
+  });
 
-  useEffect(() => {
-    const fetchResetTargets = async () => {
-      try {
-        const response = await getSupervisorResetTargets();
-        const payload = response?.data;
-        const rawTargets = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.users)
-            ? payload.users
-            : Array.isArray(payload?.targets)
-              ? payload.targets
-              : payload && typeof payload === 'object'
-                ? Object.entries(payload).map(([username, email]) => ({ username, email }))
-                : [];
-
-        const normalizedTargets = rawTargets
-          .map((target) => {
-            if (typeof target === 'string') {
-              const username = target.trim();
-              return username ? { username, email: '' } : null;
-            }
-
-            const username = String(
-              target?.username ?? target?.userName ?? target?.user_name ?? ''
-            ).trim();
-            const email = String(target?.email ?? '').trim();
-            return username ? { username, email } : null;
-          })
-          .filter(Boolean)
-          .sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' }));
-
-        setResetTargets(normalizedTargets);
-      } catch (err) {
-        toast.error(err.response?.data?.message || 'Unable to load usernames for reset.');
-      }
-    };
-
-    fetchResetTargets();
-  }, []);
-
-  const handleDownloadActionLogs = async () => {
-    setDownloadingLogs(true);
-    try {
-      const res = await downloadActionLogs();
-      const blob = new Blob([res.data], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `actions-${new Date().toISOString().slice(0, 10)}.log`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Action log downloaded.');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Unable to download action log.');
-    } finally {
-      setDownloadingLogs(false);
-    }
-  };
-
-  const handleClearActionLogs = async () => {
-    const confirmed = window.confirm('This will permanently clear the action log file. Continue?');
-    if (!confirmed) return;
-
-    setClearingLogs(true);
-    try {
-      const response = await clearActionLogs();
-      toast.success(response.data?.message || 'Action logs cleared.');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Unable to clear action logs.');
-    } finally {
-      setClearingLogs(false);
-    }
-  };
-
-  const handleSupervisorDbReset = async () => {
-    const confirmed = window.confirm(
-      'This will permanently clear bookings, reports, logs, and other runtime data. Users will be preserved. Continue?'
-    );
-    if (!confirmed) return;
-
-    setResettingDb(true);
-    try {
-      const response = await supervisorResetOperationalData();
-      toast.success(response.data?.message || 'Operational data reset complete.');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Unable to reset operational data.');
-    } finally {
-      setResettingDb(false);
-    }
-  };
-
-  const handleSupervisorEmailReset = async (event) => {
-    event.preventDefault();
-    setUpdatingEmail(true);
-    try {
-      const response = await supervisorResetUserEmail(emailResetForm.username, emailResetForm.email);
-      toast.success(response.data?.message || 'Temporary password issued successfully.');
-      setResetTargets((prev) =>
-        prev.map((target) =>
-          target.username === emailResetForm.username
-            ? { ...target, email: emailResetForm.email.trim() }
-            : target
-        )
-      );
-      setEmailResetForm({ username: '', email: '' });
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Unable to update user email.');
-    } finally {
-      setUpdatingEmail(false);
-    }
-  };
+  const accountPlaceholder = useMemo(
+    () => (resetTargets.length > 0 ? 'Select account' : 'No accounts available'),
+    [resetTargets.length],
+  );
 
   return (
     <div>
@@ -193,10 +89,19 @@ const SupervisorDashboard = () => {
           </button>
         </div>
 
+        {totalUsers !== null && (
+          <div className="stats-row">
+            <div className="stat-card card user-stat-card total">
+              <div className="stat-number total">{totalUsers}</div>
+              <div className="stat-label">Users in table</div>
+            </div>
+          </div>
+        )}
+
         <section className="recent-section supervisor-tools">
           <h3>Supervisor User Email Reset</h3>
           <p className="supervisor-tools-note">
-            Enter a stable username and any valid email for that account. Use the same email to reissue a fresh temporary password, or enter a new email to move the account and send the temporary password there.
+            Select a college account or the NES admin, then enter the email that should receive the temporary password.
           </p>
           <form className="filter-form" onSubmit={handleSupervisorEmailReset}>
             <select
@@ -213,11 +118,12 @@ const SupervisorDashboard = () => {
               required
             >
               <option value="" disabled>
-                {resetTargets.length > 0 ? 'Select username' : 'No usernames available'}
+                {accountPlaceholder}
               </option>
               {resetTargets.map((target) => (
                 <option key={target.username} value={target.username}>
-                  {target.username}
+                  {target.label || (target.role === 'admin' ? 'NES Admin' : target.username)}
+                  {target.role === 'admin' ? ` (${target.username})` : ''}
                 </option>
               ))}
             </select>
@@ -232,7 +138,7 @@ const SupervisorDashboard = () => {
               required
             />
             <button type="submit" className="btn btn-primary" disabled={updatingEmail}>
-              {updatingEmail ? 'Sending...' : 'Save Email + Send Password'}
+              {updatingEmail ? 'Sending...' : 'Send Temporary Password'}
             </button>
           </form>
         </section>

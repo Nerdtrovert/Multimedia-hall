@@ -8,9 +8,6 @@ const {
 } = require('../utils/mailer');
 const { sendPostReportReminderPush } = require('../utils/pushNotifications');
 const { isPushConfigured } = require('../utils/firebaseUtils');
-const { getPrimaryFrontendUrl } = require('../config/env');
-
-const defaultFrontendUrl = 'http://localhost:3000';
 
 const ensureReminderTable = async () => {
   await db.query(`
@@ -68,8 +65,6 @@ const runPostReportReminderJob = async () => {
     if (pendingBookings.length === 0) return;
     let deliveredCount = 0;
 
-    const uploadPageUrl = `${getPrimaryFrontendUrl() || defaultFrontendUrl}/user/my-bookings`;
-
     for (const booking of pendingBookings) {
       const recipientEmail = normalizeEmail(booking.user_email);
       let delivered = false;
@@ -82,7 +77,7 @@ const runPostReportReminderJob = async () => {
             recipientEmail,
             booking.user_name || booking.college_name,
             booking,
-            uploadPageUrl
+            '/user/my-bookings'
           );
           delivered = true;
         }

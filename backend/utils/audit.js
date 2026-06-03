@@ -25,10 +25,12 @@ const ensureActionLogFile = () => {
   }
 };
 
-const appendActionLog = (message) => {
+const appendActionLog = async (message) => {
   try {
+    // Ensure directory and file exist (quick sync check)
     ensureActionLogFile();
-    fs.appendFileSync(actionLogPath, `${formatTimestamp()} | ${message}\n`, 'utf8');
+    // Use async append to avoid blocking the event loop
+    await fs.promises.appendFile(actionLogPath, `${formatTimestamp()} | ${message}\n`, 'utf8');
   } catch (err) {
     console.error('Action log file write failed:', err.message);
   }
@@ -66,17 +68,24 @@ const logError = (context, error) => {
   console.error(`${context}:`, error);
 };
 
-const logAudit = async (action, performedBy, targetBookingId, details) => {
-  appendAuditAction(action, details);
-
+const logAudit = (action, performedBy, targetBookingId, details) => {
+  // Fire-and-forget: write to action log and schedule DB insert without awaiting
   try {
-    await db.query(
-      'INSERT INTO audit_logs (action, performed_by, target_booking_id, details) VALUES (?, ?, ?, ?)',
-      [action, performedBy, targetBookingId, details]
-    );
+    appendAuditAction(action, details);
   } catch (err) {
-    console.error('Audit log failed:', err.message);
+    console.error('appendAuditAction error:', err);
   }
+
+  // Schedule DB insert asynchronously and log failures
+  db.query(
+    'INSERT INTO audit_logs (action, performed_by, target_booking_id, details) VALUES (?, ?, ?, ?)',
+    [action, performedBy, targetBookingId, details]
+  ).catch((err) => {
+    console.error('Audit log failed (async):', err.message);
+  });
+
+  // Return a resolved promise so callers that await this function continue immediately
+  return Promise.resolve();
 };
 
 module.exports = {

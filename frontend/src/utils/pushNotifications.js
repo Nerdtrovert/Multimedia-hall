@@ -2,6 +2,8 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { toast } from 'react-toastify';
 import { registerPushToken, unregisterPushToken } from './api';
+import api from './api';
+import { getStoredAuthUserId } from './authSession';
 
 const TOKEN_STORAGE_KEY = 'fcm_token';
 let foregroundUnsubscribe = null;
@@ -64,17 +66,6 @@ const ensureFirebaseApp = () => {
   return initializeApp(getFirebaseConfig());
 };
 
-const getCurrentAuthUserId = () => {
-  try {
-    const rawAuthSession = localStorage.getItem('auth_session');
-    if (!rawAuthSession) return null;
-    const parsedAuthSession = JSON.parse(rawAuthSession);
-    return parsedAuthSession?.user?.id ? String(parsedAuthSession.user.id) : null;
-  } catch {
-    return null;
-  }
-};
-
 const getStoredTokenRecord = () => {
   const storedValue = localStorage.getItem(TOKEN_STORAGE_KEY);
   if (!storedValue) return { token: null, userId: null };
@@ -94,9 +85,7 @@ const getStoredTokenRecord = () => {
   return { token: storedValue, userId: null };
 };
 
-const getStoredToken = () => getStoredTokenRecord().token;
-
-const setStoredToken = (token, userId = getCurrentAuthUserId()) => {
+const setStoredToken = (token, userId = getStoredAuthUserId()) => {
   if (token) {
     localStorage.setItem(
       TOKEN_STORAGE_KEY,
@@ -128,31 +117,72 @@ export const enablePushNotifications = async ({ requestPermission = true, userId
   if (permission !== 'granted') return;
 
   const registration = await navigator.serviceWorker.ready;
+  console.log('Push: serviceWorker ready', registration);
+  try {
+    await api.post('/firebase/diagnostic', { event: 'serviceWorkerReady', message: 'service worker ready' });
+  } catch (_) {}
+
   const messaging = getMessaging(app);
-  const token = await getToken(messaging, {
-    vapidKey,
-    serviceWorkerRegistration: registration,
-  });
-  if (!token) return;
+  let token;
+  try {
+    token = await getToken(messaging, {
+      vapidKey,
+      serviceWorkerRegistration: registration,
+    });
+    console.log('Push: getToken result', token);
+    await api.post('/firebase/diagnostic', { event: 'getTokenSuccess', token: token || null });
+  } catch (err) {
+    console.error('Push: getToken failed', err);
+    try { await api.post('/firebase/diagnostic', { event: 'getTokenError', message: err?.message || String(err) }); } catch (_) {}
+    return;
+  }
+
+  if (!token) {
+    try { await api.post('/firebase/diagnostic', { event: 'getTokenEmpty' }); } catch (_) {}
+    return;
+  }
 
   const currentStoredToken = getStoredTokenRecord();
-  const currentUserId = userId ? String(userId) : getCurrentAuthUserId();
-  if (currentStoredToken.token !== token || currentStoredToken.userId !== currentUserId) {
+  const currentUserId = userId ? String(userId) : getStoredAuthUserId();
+  const tokenChanged =
+    currentStoredToken.token !== token || currentStoredToken.userId !== currentUserId;
+
+  try {
     await registerPushToken(token);
     setStoredToken(token, currentUserId);
+    console.log(`Push: registerPushToken succeeded (${tokenChanged ? 'changed' : 'refreshed'})`);
+    try {
+      await api.post('/firebase/diagnostic', {
+        event: tokenChanged ? 'registerPushTokenSuccess' : 'registerPushTokenRefresh',
+        token,
+      });
+    } catch (_) {}
+  } catch (err) {
+    console.error('Push: registerPushToken failed', err);
+    try {
+      await api.post('/firebase/diagnostic', {
+        event: 'registerPushTokenError',
+        message: err?.message || String(err),
+        token,
+      });
+    } catch (_) {}
+    return;
   }
 
-  if (!foregroundUnsubscribe) {
-    foregroundUnsubscribe = onMessage(messaging, (payload) => {
-      const title = payload.notification?.title || 'Notification';
-      const body = payload.notification?.body || '';
-      toast.info(body ? `${title}: ${body}` : title);
-    });
+  // Always clean up existing listener before setting up a new one
+  if (foregroundUnsubscribe) {
+    foregroundUnsubscribe();
   }
+  
+  foregroundUnsubscribe = onMessage(messaging, (payload) => {
+    const title = payload.notification?.title || 'Notification';
+    const body = payload.notification?.body || '';
+    toast.info(body ? `${title}: ${body}` : title);
+  });
 };
 
 export const disablePushNotifications = async () => {
-  const token = getStoredToken();
+  const token = getStoredTokenRecord().token;
   if (!token) {
     if (foregroundUnsubscribe) {
       foregroundUnsubscribe();
