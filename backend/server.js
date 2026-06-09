@@ -15,7 +15,7 @@ const { ensureSupervisorAccount } = require('./services/supervisorAccount');
 const { actionLogger } = require('./middleware/actionLogger');
 const { initializeFirebaseAdmin } = require('./utils/firebaseUtils');
 const { logError } = require('./utils/audit');
-const { getFrontendOrigins, getMissingRequiredEnv } = require('./config/env');
+const { getFrontendOrigins, getMissingRequiredEnv, saveLastKnownOrigin } = require('./config/env');
 const db = require('./config/db');
 
 const app = express();
@@ -32,13 +32,32 @@ const compression = require('compression');
 app.disable('x-powered-by');
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || frontendOrigins.includes(origin)) {
+    if (!origin || frontendOrigins.includes(origin) || /\.devtunnels\.ms$/i.test(origin)) {
       return callback(null, true);
     }
     return callback(new Error('CORS origin not allowed.'));
   },
   credentials: true,
 }));
+
+// Automatically save the last known devtunnel origin when requests come in
+app.use((req, res, next) => {
+  const origin = req.headers.origin || req.headers.referer;
+  if (origin) {
+    let parsedOrigin = origin;
+    if (origin.startsWith('http://') || origin.startsWith('https://')) {
+      try {
+        const u = new URL(origin);
+        parsedOrigin = u.origin;
+      } catch (e) {}
+    }
+    if (parsedOrigin.includes('.devtunnels.ms')) {
+      saveLastKnownOrigin(parsedOrigin);
+    }
+  }
+  next();
+});
+
 app.use(compression());
 app.use(express.json());
 app.use(actionLogger);

@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 const normalizeUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
 
 const parseOriginList = (value) =>
@@ -6,10 +9,46 @@ const parseOriginList = (value) =>
     .map((item) => normalizeUrl(item))
     .filter(Boolean);
 
+const lastKnownOriginFile = path.resolve(__dirname, '..', '.last_known_origin');
+
+const saveLastKnownOrigin = (origin) => {
+  try {
+    if (origin && origin.includes('.devtunnels.ms')) {
+      const normalized = normalizeUrl(origin);
+      let currentStored = '';
+      if (fs.existsSync(lastKnownOriginFile)) {
+        currentStored = fs.readFileSync(lastKnownOriginFile, 'utf8').trim();
+      }
+      if (normalized !== currentStored) {
+        fs.writeFileSync(lastKnownOriginFile, normalized, 'utf8');
+      }
+    }
+  } catch (err) {
+    console.error('Error saving last known origin:', err);
+  }
+};
+
+const getLastKnownOrigin = () => {
+  try {
+    if (fs.existsSync(lastKnownOriginFile)) {
+      return fs.readFileSync(lastKnownOriginFile, 'utf8').trim();
+    }
+  } catch (err) {
+    // ignore
+  }
+  return '';
+};
+
 const getFrontendOrigins = () => {
   const configuredOrigins = parseOriginList(process.env.FRONTEND_URL);
+
+  const lastKnown = getLastKnownOrigin();
+  if (lastKnown) {
+    configuredOrigins.push(lastKnown);
+  }
+
   if (configuredOrigins.length > 0) {
-    return configuredOrigins;
+    return [...new Set(configuredOrigins)];
   }
 
   return [
@@ -44,4 +83,5 @@ module.exports = {
   getBackendOrigins,
   getPrimaryBackendUrl,
   getMissingRequiredEnv,
+  saveLastKnownOrigin,
 };

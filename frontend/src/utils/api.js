@@ -9,7 +9,32 @@ const parseUrlList = (value) =>
     .map((item) => normalizeUrl(item))
     .filter(Boolean);
 
-const getConfiguredApiBase = () => parseUrlList(import.meta.env.VITE_API_BASE_URL || "/api")[0] || "/api";
+const getConfiguredApiBase = () => {
+  const envVal = import.meta.env.VITE_API_BASE_URL;
+  const currentOrigin = window.location.origin;
+
+  // Check if we are currently accessing the app via a devtunnel url
+  const matchCurrent = currentOrigin.match(/^https?:\/\/([a-z0-9]+)-3000\.(.*)$/i);
+  if (matchCurrent) {
+    const tunnelId = matchCurrent[1];
+    const rest = matchCurrent[2];
+    return `https://${tunnelId}-5000.${rest}/api`;
+  }
+
+  if (envVal && envVal !== "/api") {
+    // If the environment variable is a devtunnel URL, and the browser is also on a devtunnel URL,
+    // dynamically sync the tunnel ID to the current one
+    if (envVal.includes(".devtunnels.ms") && currentOrigin.includes(".devtunnels.ms")) {
+      const matchEnv = envVal.match(/^(https?:\/\/)[a-z0-9]+(-5000\..*)$/i);
+      if (matchEnv && matchCurrent) {
+        return `${matchEnv[1]}${matchCurrent[1]}${matchEnv[2]}`;
+      }
+    }
+    return parseUrlList(envVal)[0] || "/api";
+  }
+
+  return "/api";
+};
 
 const api = axios.create({
   baseURL: getConfiguredApiBase(),
